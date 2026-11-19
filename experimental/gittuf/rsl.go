@@ -397,8 +397,19 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 
 	// Apply local only entries on top of the new local RSL
 	// localOnlyEntries is in reverse order
+	//
+	// Reapplying an entry changes its parent and/or its RSL number, so it is
+	// committed with a new ID. Annotation entries refer to the entries they
+	// annotate by ID, so as we replay entries here, we track how each
+	// original entry's ID maps to the new ID it is assigned, and rewrite an
+	// annotation's referenced IDs using that mapping. Otherwise, an annotation
+	// on a reapplied entry (a skip or just a message) would silently stop
+	// applying to it, as it would still refer to the original entry's now
+	// unreachable ID.
+	oldToNewEntryID := map[string]githash.Hash{}
 	for i := len(localOnlyEntries) - 1; i >= 0; i-- {
-		slog.Debug("Reapplying RSL entry", "entryID", localOnlyEntries[i].GetID().String())
+		originalEntryID := localOnlyEntries[i].GetID()
+		slog.Debug("Reapplying RSL entry", "entryID", originalEntryID.String())
 
 		// We create a new object so as to apply anything the
 		// entry may contain that is inferred at commit time
@@ -409,20 +420,33 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		switch entry := localOnlyEntries[i].(type) {
 		case *rsl.ReferenceEntry:
 			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply reference entry '%s': %w", entry.ID.String(), err)
+				return fmt.Errorf("unable to reapply reference entry '%s': %w", originalEntryID.String(), err)
 			}
 		case *rsl.AnnotationEntry:
-			if err := rsl.NewAnnotationEntry(entry.RSLEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply annotation entry '%s': %w", entry.ID.String(), err)
+			rslEntryIDs := make([]githash.Hash, 0, len(entry.RSLEntryIDs))
+			for _, id := range entry.RSLEntryIDs {
+				if newID, ok := oldToNewEntryID[id.String()]; ok {
+					// The annotated entry was itself reapplied earlier in
+					// this loop and was assigned a new ID; the annotation
+					// must follow it rather than the stale ID.
+					id = newID
+				}
+				rslEntryIDs = append(rslEntryIDs, id)
+			}
+
+			if err := rsl.NewAnnotationEntry(rslEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
+				return fmt.Errorf("unable to reapply annotation entry '%s': %w", originalEntryID.String(), err)
 			}
 		}
 
+		currentTip, err := r.r.GetReference(rsl.Ref)
+		if err != nil {
+			return fmt.Errorf("unable to get current tip of the RSL: %w", err)
+		}
+		oldToNewEntryID[originalEntryID.String()] = currentTip
+
 		if slog.Default().Enabled(ctx, slog.LevelDebug) {
-			currentTip, err := r.r.GetReference(rsl.Ref)
-			if err != nil {
-				return fmt.Errorf("unable to get current tip of the RSL: %w", err)
-			}
-			slog.Debug("Reapplied RSL entry has new ID", "originalEntryID", localOnlyEntries[i].GetID().String(), "newEntryID", currentTip.String())
+			slog.Debug("Reapplied RSL entry has new ID", "originalEntryID", originalEntryID.String(), "newEntryID", currentTip.String())
 		}
 	}
 
