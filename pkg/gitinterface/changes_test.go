@@ -18,7 +18,7 @@ func TestGetFilePathsChangedByCommitRepository(t *testing.T) {
 	treeBuilder := NewTreeBuilder(repo)
 
 	blobIDs := []Hash{}
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		blobID, err := repo.WriteBlob([]byte(fmt.Sprintf("%d", i)))
 		require.NoError(t, err)
 		blobIDs = append(blobIDs, blobID)

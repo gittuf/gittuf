@@ -14,15 +14,7 @@ import (
 func TestStatus(t *testing.T) {
 	tmpDir := t.TempDir()
 	repo := CreateTestGitRepository(t, tmpDir, false)
-
-	cwd, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := os.Chdir(tmpDir); err != nil {
-		t.Fatal(err)
-	}
-	defer os.Chdir(cwd) //nolint:errcheck
+	t.Chdir(tmpDir)
 
 	// NOTE: we don't use traditional methods like WriteBlob or TreeBuilder so
 	// we can more closely simulate user actions, such as with updating index,

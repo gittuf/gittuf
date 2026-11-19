@@ -316,7 +316,7 @@ func TestParseRSLEntryTextDropsCustomFieldsOutsideTheGrammar(t *testing.T) {
 func TestParseRSLEntryTextCapsCustomFieldCount(t *testing.T) {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s\n\n%s: %s\n%s: %s", ReferenceEntryHeader, RefKey, "refs/heads/main", TargetIDKey, gitinterface.ZeroHash.String())
-	for i := 0; i < customfields.MaxCount+10; i++ {
+	for i := range customfields.MaxCount + 10 {
 		fmt.Fprintf(&b, "\ncustom.example.com/field-%02d: v", i)
 	}
 
@@ -1591,7 +1591,7 @@ func TestGetFirstEntry(t *testing.T) {
 	}
 	firstEntry := firstEntryT.(*ReferenceEntry)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -1602,7 +1602,7 @@ func TestGetFirstEntry(t *testing.T) {
 	assert.Nil(t, annotations)
 	assert.Equal(t, firstEntry, testEntry)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := NewAnnotationEntry([]githash.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -1629,7 +1629,7 @@ func TestGetFirstReferenceUpdaterEntryForRef(t *testing.T) {
 	}
 	firstEntry := firstEntryT.(*ReferenceEntry)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := NewReferenceEntry("main", gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -1640,7 +1640,7 @@ func TestGetFirstReferenceUpdaterEntryForRef(t *testing.T) {
 	assert.Nil(t, annotations)
 	assert.Equal(t, firstEntry, testEntry)
 
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		if err := NewAnnotationEntry([]githash.Hash{firstEntry.ID}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -1846,7 +1846,7 @@ func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
 	mainRef := "refs/heads/main"
 
 	initialTargetIDs := []githash.Hash{}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		commitID, err := repo.Commit(emptyTreeHash, mainRef, "Test commit", false)
 		if err != nil {
 			t.Fatal(err)
@@ -1887,7 +1887,7 @@ func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {
 
 	// Next, add some new commits to this branch.
 	featureTargetIDs := []githash.Hash{}
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		commitID, err := repo.Commit(emptyTreeHash, featureRef, "Feature commit", false)
 		if err != nil {
 			t.Fatal(err)
@@ -1972,7 +1972,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 	expectedAnnotationMap := map[string][]*AnnotationEntry{}
 
 	// Add some entries to main
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -1986,7 +1986,7 @@ func TestGetReferenceUpdaterEntriesInRange(t *testing.T) {
 	}
 
 	// Add some annotations
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := NewAnnotationEntry([]githash.Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -2076,7 +2076,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	expectedAnnotationMap := map[string][]*AnnotationEntry{}
 
 	// Add some entries to main
-	for i := 0; i < 3; i++ {
+	for range 3 {
 		if err := NewReferenceEntry(refName, gitinterface.ZeroHash).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
@@ -2090,7 +2090,7 @@ func TestGetReferenceUpdaterEntriesInRangeForRef(t *testing.T) {
 	}
 
 	// Add some annotations
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		if err := NewAnnotationEntry([]githash.Hash{expectedEntries[i].GetID()}, false, annotationMessage).Commit(repo, false); err != nil {
 			t.Fatal(err)
 		}
