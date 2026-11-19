@@ -12,7 +12,7 @@
 ## Abstract
 
 gittuf's policy, like TUF metadata that it is inspired by, assumes that all
-actors are [represented by their signing keys](/docs/design-document.md#actors).
+actors are [represented by their signing keys](/docs/design-document.md#actors-and-authentication).
 This assumption leads to usability problems in Git development in contrast to
 traditional TUF deployments in packaging ecosystems and the like.
 
