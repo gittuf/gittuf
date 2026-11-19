@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
@@ -407,8 +408,8 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	// applying to it, as it would still refer to the original entry's now
 	// unreachable ID.
 	oldToNewEntryID := map[string]githash.Hash{}
-	for i := len(localOnlyEntries) - 1; i >= 0; i-- {
-		originalEntryID := localOnlyEntries[i].GetID()
+	for _, localOnlyEntry := range slices.Backward(localOnlyEntries) {
+		originalEntryID := localOnlyEntry.GetID()
 		slog.Debug("Reapplying RSL entry", "entryID", originalEntryID.String())
 
 		// We create a new object so as to apply anything the
@@ -417,7 +418,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		// parent entry
 		// WithCustomFields copies the fields into the new entry, so the
 		// original entry's map can be passed directly without cloning it first.
-		switch entry := localOnlyEntries[i].(type) {
+		switch entry := localOnlyEntry.(type) {
 		case *rsl.ReferenceEntry:
 			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
 				return fmt.Errorf("unable to reapply reference entry '%s': %w", originalEntryID.String(), err)

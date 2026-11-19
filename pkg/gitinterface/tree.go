@@ -460,22 +460,22 @@ func (t *TreeBuilder) writeTrees(parent string, tree *entryTree) (Hash, error) {
 // because it is only intended for use with gittuf specific metadata and tests.
 // Generic tree creation is left to invocations of the Git binary by the user.
 func (t *TreeBuilder) writeTree(entries []treeNode) (Hash, error) {
-	input := ""
+	var input strings.Builder
 	for _, entry := range entries {
 		// this is very opinionated about the modes right now because the plan
 		// is to use it for gittuf metadata, which requires regular files and
 		// subdirectories
 		switch entry := entry.(type) {
 		case *entryTree:
-			input += "040000 tree " + entry.gitID.String() + "\t" + entry.name
+			input.WriteString("040000 tree " + entry.gitID.String() + "\t" + entry.name)
 		case *entryBlob:
 			// TODO: support entryBlob's permissions here
-			input += "100644 blob " + entry.gitID.String() + "\t" + entry.name
+			input.WriteString("100644 blob " + entry.gitID.String() + "\t" + entry.name)
 		}
-		input += "\n"
+		input.WriteString("\n")
 	}
 
-	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input)).executeString()
+	stdOut, err := t.repo.executor("mktree").withStdIn(bytes.NewBufferString(input.String())).executeString()
 	if err != nil {
 		return ZeroHash, fmt.Errorf("unable to write Git tree: %w", err)
 	}

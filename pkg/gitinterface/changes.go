@@ -5,7 +5,7 @@ package gitinterface
 
 import (
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -66,9 +66,7 @@ func (r *Repository) GetFilePathsChangedByCommit(commitID Hash) ([]string, error
 			paths = append(paths, path)
 		}
 
-		sort.Slice(paths, func(i, j int) bool {
-			return paths[i] < paths[j]
-		})
+		slices.Sort(paths)
 
 		return paths, nil
 	}

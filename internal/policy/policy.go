@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"os"
 	"strings"
 
@@ -195,9 +196,7 @@ func (s *StateMetadata) WriteTree(repo gitstore.Storer) (githash.Hash, error) {
 	}
 
 	if s.DelegationEnvelopes != nil {
-		for k, v := range s.DelegationEnvelopes {
-			metadata[k] = v
-		}
+		maps.Copy(metadata, s.DelegationEnvelopes)
 	}
 
 	entries := make([]gitstore.TreeEntry, 0, len(metadata))
@@ -561,9 +560,7 @@ func (s *State) findVerifiersForPathIfProtected(path string) ([]*SignatureVerifi
 
 					seenRoles[delegation.ID()] = true
 
-					for principalID, principal := range delegatedMetadata.GetPrincipals() {
-						allPrincipals[principalID] = principal
-					}
+					maps.Copy(allPrincipals, delegatedMetadata.GetPrincipals())
 
 					// Add the current metadata's further delegations upfront to
 					// be depth-first
@@ -677,9 +674,7 @@ func (s *State) Verify(ctx context.Context) error {
 				}
 
 				delegationsQueue = append(delegatedMetadata.GetRules(), delegationsQueue...)
-				for keyID, key := range delegatedMetadata.GetPrincipals() {
-					delegationKeys[keyID] = key
-				}
+				maps.Copy(delegationKeys, delegatedMetadata.GetPrincipals())
 			}
 		}
 
@@ -1179,9 +1174,7 @@ func (s *State) preprocess() error {
 		s.allPrincipals = map[string]tuf.Principal{}
 	}
 
-	for principalID, principal := range rootMetadata.GetPrincipals() {
-		s.allPrincipals[principalID] = principal
-	}
+	maps.Copy(s.allPrincipals, rootMetadata.GetPrincipals())
 
 	s.GitHubApps, err = rootMetadata.GetGitHubAppEntries()
 	if err != nil {
@@ -1199,9 +1192,7 @@ func (s *State) preprocess() error {
 		return err
 	}
 
-	for principalID, principal := range targetsMetadata.GetPrincipals() {
-		s.allPrincipals[principalID] = principal
-	}
+	maps.Copy(s.allPrincipals, targetsMetadata.GetPrincipals())
 
 	for _, rule := range targetsMetadata.GetRules() {
 		if rule.ID() == tuf.AllowRuleName {
@@ -1232,9 +1223,7 @@ func (s *State) preprocess() error {
 				return err
 			}
 
-			for principalID, principal := range delegatedMetadata.GetPrincipals() {
-				s.allPrincipals[principalID] = principal
-			}
+			maps.Copy(s.allPrincipals, delegatedMetadata.GetPrincipals())
 
 			for _, rule := range delegatedMetadata.GetRules() {
 				if rule.ID() == tuf.AllowRuleName {
