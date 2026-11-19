@@ -4,7 +4,6 @@
 package gittuf
 
 import (
-	"os"
 	"path/filepath"
 	"testing"
 
@@ -23,14 +22,7 @@ func TestLoadRepository(t *testing.T) {
 
 	t.Run("load with no repo, unsuccessful", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		repository, err := LoadRepository(tmpDir)
 		assert.ErrorContains(t, err, "unable to identify git directory for repository")
@@ -39,14 +31,7 @@ func TestLoadRepository(t *testing.T) {
 
 	t.Run("successful load", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		currentDir, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		repository, err := LoadRepository(tmpDir)

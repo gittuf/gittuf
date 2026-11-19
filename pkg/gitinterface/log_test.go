@@ -26,7 +26,7 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 	}
 
 	allCommits := []Hash{}
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		commitHash, err := repo.Commit(emptyTreeID, refName, "Test commit\n", false)
 		require.Nil(t, err)
 		allCommits = append(allCommits, commitHash)
@@ -81,14 +81,14 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		}
 
 		mainBranchCommits := []Hash{}
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			commitHash, err := repo.Commit(emptyTreeID, mainBranch, fmt.Sprintf("Main commit %d\n", i), false)
 			require.Nil(t, err)
 			mainBranchCommits = append(mainBranchCommits, commitHash)
 		}
 
 		featureBranchCommits := []Hash{}
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			commitHash, err := repo.Commit(emptyTreeID, featureBranch, fmt.Sprintf("Feature commit %d\n", i), false)
 			require.Nil(t, err)
 			featureBranchCommits = append(featureBranchCommits, commitHash)
@@ -145,14 +145,14 @@ func TestGetCommitsBetweenRangeRepository(t *testing.T) {
 		}
 
 		mainBranchCommits = []Hash{}
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			commitHash, err := repo.Commit(emptyTreeID, mainBranch, fmt.Sprintf("Main commit %d\n", i), false)
 			require.Nil(t, err)
 			mainBranchCommits = append(mainBranchCommits, commitHash)
 		}
 
 		featureBranchCommits = []Hash{}
-		for i := 0; i < 5; i++ {
+		for i := range 5 {
 			commitHash, err := repo.Commit(emptyTreeID, featureBranch, fmt.Sprintf("Feature commit %d\n", i), false)
 			require.Nil(t, err)
 			featureBranchCommits = append(featureBranchCommits, commitHash)
