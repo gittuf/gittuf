@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto"
 	"fmt"
-	"log"
 	"log/slog"
 	"time"
 
@@ -217,7 +216,7 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 
 	bundleJSON, err := protojson.Marshal(bundle)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return bundleJSON, nil
