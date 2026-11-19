@@ -608,20 +608,29 @@ func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirectiv
 // UpdatePropagationDirective updates a propagation directive in the root
 // metadata.
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
-	updatedPropagationDirectives := []tuf.PropagationDirective{}
-	found := false
-
 	if len(r.Propagations) == 0 {
 		return tuf.ErrPropagationDirectiveNotFound
 	}
+
+	updatedPropagationDirectives := []tuf.PropagationDirective{}
+	found := false
 
 	for _, oldPropagationDirective := range r.Propagations {
 		if oldPropagationDirective.GetName() == directive.GetName() {
 			found = true
 			updatedPropagationDirectives = append(updatedPropagationDirectives, directive)
-		} else {
-			updatedPropagationDirectives = append(updatedPropagationDirectives, oldPropagationDirective)
+			continue
 		}
+
+		if oldPropagationDirective.GetUpstreamRepository() == directive.GetUpstreamRepository() &&
+			oldPropagationDirective.GetUpstreamReference() == directive.GetUpstreamReference() &&
+			oldPropagationDirective.GetUpstreamPath() == directive.GetUpstreamPath() &&
+			oldPropagationDirective.GetDownstreamReference() == directive.GetDownstreamReference() &&
+			oldPropagationDirective.GetDownstreamPath() == directive.GetDownstreamPath() {
+			return tuf.ErrPropagationDirectiveAlreadyExists
+		}
+
+		updatedPropagationDirectives = append(updatedPropagationDirectives, oldPropagationDirective)
 	}
 
 	if !found {
