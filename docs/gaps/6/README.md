@@ -13,7 +13,7 @@
 ## Abstract
 
 gittuf's [reference authorization
-attestations](/docs/design-document.md#reference-authorization) can be used to
+attestations](/docs/design-document.md#attestations-for-authorization-records) can be used to
 meet a threshold of approvals for a change in a Git repository. Here, every
 approver signs the attestation themselves, minimizing the trusted entities
 during verification, but this has usability concerns. To balance usability and
