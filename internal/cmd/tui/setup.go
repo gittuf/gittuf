@@ -7,8 +7,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/spinner"
@@ -20,7 +18,6 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
-	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 type wizardStep int
@@ -58,43 +55,45 @@ type setupDoneMsg struct {
 var (
 	setupModalStyle = lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder()).
-			BorderForeground(lipgloss.Color("#2ea043")).
+			BorderForeground(lipgloss.Color(colorSuccessMsg)).
 			Padding(1, 2)
 
 	setupTitleStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#3fb950")).
+			Foreground(lipgloss.Color(colorSuccessMsg)).
 			Bold(true)
 
 	setupDescStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#c9d1d9"))
+			Foreground(lipgloss.Color(colorRegularText))
 
 	setupMutedStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("#8b949e"))
+			Foreground(lipgloss.Color(colorSubtext))
 
 	setupHighlightStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#58a6ff")).
+				Foreground(lipgloss.Color(colorFocus)).
 				Bold(true)
 
 	setupSelectedOptStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#58a6ff")).
+				Foreground(lipgloss.Color(colorFocus)).
 				Bold(true)
 
 	setupNormalOptStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#c9d1d9"))
+				Foreground(lipgloss.Color(colorRegularText))
 
 	setupFooterStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("#3fb950")).
+				Foreground(lipgloss.Color(colorSuccessMsg)).
 				PaddingTop(1)
 )
 
 func newSetupWizard(repo *gittuf.Repository, detectedKey string) setupWizardModel {
-	if detectedKey == "" {
-		detectedKey = discoverGitConfigKey(repo)
+	if detectedKey == "" && repo != nil {
+		if key, err := gittuf.LoadPublicKeyFromGitConfig(repo); err == nil {
+			detectedKey = key.ID()
+		}
 	}
 
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#3fb950"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(colorSuccessMsg))
 
 	bi := textinput.New()
 	bi.Placeholder = "e.g. main"
@@ -127,149 +126,50 @@ func hasPolicyOrStaging(repo *gittuf.Repository) bool {
 		return true
 	}
 
-	if storer := repo.GetStorer(); storer != nil {
-		if _, err := storer.GetReference(policy.PolicyStagingRef); err == nil {
-			return true
-		}
+	if _, err := repo.GetStorer().GetReference(policy.PolicyStagingRef); err == nil {
+		return true
 	}
 
 	return false
 }
 
-// discoverGitConfigKey queries the repository's Git configuration to find the
-// user's configured signing key.
-func discoverGitConfigKey(repo *gittuf.Repository) string {
-	if repo == nil || repo.GetStorer() == nil {
-		return ""
-	}
-
-	storer := repo.GetStorer()
-	format, _, err := storer.LookupConfig(gitstore.ConfigGPGFormat)
-	if err != nil {
-		return ""
-	}
-
-	signingKey, _, err := storer.LookupConfig(gitstore.ConfigUserSigningKey)
-	if err != nil {
-		return ""
-	}
-	signingKey = strings.TrimSpace(signingKey)
-	if signingKey == "" {
-		return ""
-	}
-
-	switch format {
-	case "gpg", "":
-		if strings.HasPrefix(signingKey, gittuf.GPGKeyPrefix) {
-			return signingKey
-		}
-		// gpg.format is unset but the key is an existing file (e.g., an SSH
-		// key): treat it as a file path instead of a GPG key ID.
-		if format == "" && isFileKeyPath(signingKey) {
-			if _, statErr := os.Stat(signingKey); statErr == nil {
-				return signingKey
-			}
-		}
-		return gittuf.GPGKeyPrefix + signingKey
-	case "ssh":
-		return signingKey
-	case "x509":
-		x509Program, _, err := storer.LookupConfig(gitstore.ConfigGPGX509Program)
-		if err != nil || x509Program != "gitsign" {
-			return ""
-		}
-		if strings.HasPrefix(signingKey, gittuf.FulcioPrefix) {
-			return signingKey
-		}
-		return gittuf.FulcioPrefix + signingKey
-	default:
-		return ""
-	}
-}
-
-// isFileKeyPath reports whether keyRef is a plain file path rather than a
-// scheme-prefixed key reference (gpg:, fulcio:). A bare ':' is not enough to
-// tell them apart, as Windows paths contain a drive-letter colon (C:\...).
-func isFileKeyPath(keyRef string) bool {
-	return !strings.HasPrefix(keyRef, gittuf.GPGKeyPrefix) && !strings.HasPrefix(keyRef, gittuf.FulcioPrefix)
-}
-
-// formatKeyLabel converts a raw key reference into a clean, human-readable display string.
-func formatKeyLabel(keyPath string) string {
-	if keyPath == "" {
-		return ""
-	}
-
-	displayPath := keyPath
-	if !strings.HasSuffix(displayPath, ".pub") && !strings.HasPrefix(displayPath, gittuf.GPGKeyPrefix) && !strings.HasPrefix(displayPath, gittuf.FulcioPrefix) {
-		if _, err := os.Stat(displayPath + ".pub"); err == nil {
-			displayPath += ".pub"
-		}
-	}
-
-	home, err := os.UserHomeDir()
-	if err == nil && home != "" && strings.HasPrefix(displayPath, home) {
-		displayPath = "~" + strings.TrimPrefix(displayPath, home)
-	}
-	displayPath = filepath.ToSlash(displayPath)
-
-	keyType := "SSH Key"
-	if strings.HasPrefix(displayPath, gittuf.GPGKeyPrefix) {
-		keyType = "GPG Key"
-	} else if strings.HasPrefix(displayPath, gittuf.FulcioPrefix) {
-		keyType = "Sigstore OIDC"
-	}
-
-	return fmt.Sprintf("%s (%s)", displayPath, keyType)
-}
-
 // applySetupPolicyCmd coordinates initializing the root of trust, top-level
 // targets policy, and branch protection rule.
-func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyPath, branchName string) tea.Cmd {
+func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, branchName string) tea.Cmd {
 	return func() tea.Msg {
 		branchName = strings.TrimPrefix(strings.TrimSpace(branchName), "refs/heads/")
 		if branchName == "" {
 			branchName = "main"
 		}
-		if keyPath == "" {
-			return setupDoneMsg{err: errors.New("no signing key specified")}
-		}
-
-		// Resolve signing key (private key) vs principal key (public key)
-		signingKeyPath, pubKeyPath := keyPath, keyPath
-		if isFileKeyPath(keyPath) {
-			priv := strings.TrimSuffix(keyPath, ".pub")
-			if _, err := os.Stat(priv); err == nil {
-				signingKeyPath = priv
-			}
-			if _, err := os.Stat(priv + ".pub"); err == nil {
-				pubKeyPath = priv + ".pub"
-			}
-		}
 
 		var (
-			signer    dsse.SignerVerifier
-			principal tuf.Principal
-			err       error
+			signer     dsse.SignerVerifier
+			principal  tuf.Principal
+			signingKey string
+			err        error
 		)
 
-		if gitKey := discoverGitConfigKey(repo); gitKey != "" && keyPath == gitKey {
+		if gitKey, gitErr := gittuf.LoadPublicKeyFromGitConfig(repo); gitErr == nil && (keyRef == "" || keyRef == gitKey.ID()) {
+			principal = gitKey
 			signer, err = gittuf.LoadSignerFromGitConfig(repo)
-			if err == nil {
-				principal, err = gittuf.LoadPublicKeyFromGitConfig(repo)
-			}
-		}
-
-		if signer == nil || principal == nil || err != nil {
-			signer, err = gittuf.LoadSigner(repo, signingKeyPath)
 			if err != nil {
-				return setupDoneMsg{err: fmt.Errorf("failed to load signer for key '%s': %w", signingKeyPath, err)}
+				return setupDoneMsg{err: fmt.Errorf("failed to load signer from Git config: %w", err)}
+			}
+		} else {
+			if keyRef == "" {
+				return setupDoneMsg{err: errors.New("no signing key specified")}
 			}
 
-			principal, err = gittuf.LoadPublicKey(pubKeyPath)
+			signer, err = gittuf.LoadSigner(repo, keyRef)
 			if err != nil {
-				return setupDoneMsg{err: fmt.Errorf("failed to load public key for '%s': %w", pubKeyPath, err)}
+				return setupDoneMsg{err: fmt.Errorf("failed to load signer for key '%s': %w", keyRef, err)}
 			}
+
+			principal, err = gittuf.LoadPublicKey(keyRef)
+			if err != nil {
+				return setupDoneMsg{err: fmt.Errorf("failed to load public key for '%s': %w", keyRef, err)}
+			}
+			signingKey = keyRef
 		}
 
 		// 1. Initialize Root of Trust
@@ -309,15 +209,13 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyPath, 
 		}
 
 		// 7. Record initial RSL entry for target branch if reference exists
-		if repo.GetGitRepository() != nil {
-			if _, refErr := repo.GetGitRepository().GetReference("refs/heads/" + branchName); refErr == nil {
-				_ = repo.RecordRSLEntryForReference(ctx, "refs/heads/"+branchName, false)
-			}
+		if _, refErr := repo.GetStorer().GetReference("refs/heads/" + branchName); refErr == nil {
+			_ = repo.RecordRSLEntryForReference(ctx, "refs/heads/"+branchName, false)
 		}
 
 		return setupDoneMsg{
 			signer:     signer,
-			signingKey: signingKeyPath,
+			signingKey: signingKey,
 			err:        nil,
 		}
 	}
@@ -483,13 +381,13 @@ func renderSetupWizardDialog(m model) string {
 		if w.gitConfigKey != "" {
 			items = append(items,
 				setupDescStyle.Render("Detected signing key from Git configuration:"),
-				fmt.Sprintf("  %s", setupHighlightStyle.Render(formatKeyLabel(w.gitConfigKey))),
+				fmt.Sprintf("  %s", setupHighlightStyle.Render(w.gitConfigKey)),
 				"",
 				setupDescStyle.Render("Use this key for Root of Trust and Top-Level Policy, or override it:"),
 				"",
 			)
 			labels = []string{
-				fmt.Sprintf("Use key from Git config (%s)", formatKeyLabel(w.gitConfigKey)),
+				fmt.Sprintf("Use key from Git config (%s)", w.gitConfigKey),
 				"Override signing key",
 			}
 		} else {
@@ -530,7 +428,7 @@ func renderSetupWizardDialog(m model) string {
 		if branchPreview == "" {
 			branchPreview = "main"
 		}
-		keyLabel := formatKeyLabel(w.selectedKey)
+		keyLabel := w.selectedKey
 
 		content = lipgloss.JoinVertical(lipgloss.Left,
 			setupTitleStyle.Render("Step 2 of 2: Confirm Protected Branch & Policy"),
@@ -556,7 +454,7 @@ func renderSetupWizardDialog(m model) string {
 		)
 
 	case wizardStepComplete:
-		keyLabel := formatKeyLabel(w.selectedKey)
+		keyLabel := w.selectedKey
 		content = lipgloss.JoinVertical(lipgloss.Left,
 			setupTitleStyle.Render("Policy Applied Successfully"),
 			"",
@@ -571,7 +469,7 @@ func renderSetupWizardDialog(m model) string {
 
 	case wizardStepError:
 		content = lipgloss.JoinVertical(lipgloss.Left,
-			lipgloss.NewStyle().Foreground(lipgloss.Color("#f85149")).Bold(true).Render("Setup Failed"),
+			lipgloss.NewStyle().Foreground(lipgloss.Color(colorErrorMsg)).Bold(true).Render("Setup Failed"),
 			"",
 			setupDescStyle.Render(fmt.Sprintf("Error: %v", w.err)),
 			"",

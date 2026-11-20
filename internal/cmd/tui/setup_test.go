@@ -6,9 +6,6 @@ package tui
 import (
 	"context"
 	"errors"
-	"os"
-	"path/filepath"
-	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -29,6 +26,22 @@ func TestNewSetupWizard(t *testing.T) {
 	assert.Equal(t, "test-key.pub", wizard.selectedKey)
 	assert.Equal(t, "main", wizard.branchInput.Value())
 	assert.Contains(t, wizard.keyInput.Placeholder, "fulcio:")
+
+	t.Run("detects key from Git config", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGFormat), "x509"))
+		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGX509Program), "gitsign"))
+		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserSigningKey), "dev@example.com::https://accounts.google.com"))
+
+		t.Chdir(tmpDir)
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		w := newSetupWizard(repo, "")
+		assert.Equal(t, "dev@example.com::https://accounts.google.com", w.gitConfigKey)
+		assert.Equal(t, "dev@example.com::https://accounts.google.com", w.selectedKey)
+	})
 }
 
 func TestHasPolicyOrStaging(t *testing.T) {
@@ -58,50 +71,6 @@ func TestHasPolicyOrStaging(t *testing.T) {
 
 	// hasPolicyOrStaging must return true when policy-staging exists
 	assert.True(t, hasPolicyOrStaging(repo))
-}
-
-func TestDiscoverGitConfigKey(t *testing.T) {
-	assert.Equal(t, "", discoverGitConfigKey(nil))
-
-	t.Run("ssh signing key", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGFormat), "ssh"))
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserSigningKey), "/path/to/id_ed25519.pub"))
-
-		t.Chdir(tmpDir)
-		repo, err := gittuf.LoadRepository(".")
-		require.NoError(t, err)
-
-		assert.Equal(t, "/path/to/id_ed25519.pub", discoverGitConfigKey(repo))
-	})
-
-	t.Run("gpg signing key", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGFormat), "gpg"))
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserSigningKey), "1234567890ABCDEF"))
-
-		t.Chdir(tmpDir)
-		repo, err := gittuf.LoadRepository(".")
-		require.NoError(t, err)
-
-		assert.Equal(t, "gpg:1234567890ABCDEF", discoverGitConfigKey(repo))
-	})
-
-	t.Run("sigstore x509 gitsign key", func(t *testing.T) {
-		tmpDir := t.TempDir()
-		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGFormat), "x509"))
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGX509Program), "gitsign"))
-		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserSigningKey), "dev@example.com::https://accounts.google.com"))
-
-		t.Chdir(tmpDir)
-		repo, err := gittuf.LoadRepository(".")
-		require.NoError(t, err)
-
-		assert.Equal(t, "fulcio:dev@example.com::https://accounts.google.com", discoverGitConfigKey(repo))
-	})
 }
 
 func TestUpdateSetupWizardGuidedFlow(t *testing.T) {
@@ -237,25 +206,6 @@ func TestUpdateSetupWizardErrorHandling(t *testing.T) {
 	m = res.(model)
 	assert.False(t, m.showSetupWizard)
 	assert.True(t, m.readOnly)
-}
-
-func TestFormatKeyLabel(t *testing.T) {
-	assert.Equal(t, "", formatKeyLabel(""))
-
-	gpgLabel := formatKeyLabel("gpg:1234567890ABCDEF")
-	assert.Contains(t, gpgLabel, "GPG Key")
-	assert.Contains(t, gpgLabel, "1234567890ABCDEF")
-
-	fulcioLabel := formatKeyLabel("fulcio:user@example.com::https://accounts.google.com")
-	assert.Contains(t, fulcioLabel, "Sigstore OIDC")
-
-	home, err := os.UserHomeDir()
-	if err == nil && home != "" {
-		testKeyPath := filepath.Join(home, ".ssh", "id_ed25519.pub")
-		label := formatKeyLabel(testKeyPath)
-		assert.True(t, strings.HasPrefix(label, "~/.ssh/id_ed25519.pub") || strings.HasPrefix(label, "~\\.ssh\\id_ed25519.pub"))
-		assert.Contains(t, label, "SSH Key")
-	}
 }
 
 func TestRenderSetupWizardDialog(t *testing.T) {
