@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type pagerTestCat struct{}
@@ -48,8 +49,17 @@ func TestPagerResolution(t *testing.T) {
 	t.Setenv("PAGER", "less")
 
 	pager := getPagerReal()
-	assert.Equal(t, "less", pager.getBinary())
-	assert.Equal(t, []string{}, pager.getFlags())
+	if _, err := exec.LookPath("less"); err != nil && runtime.GOOS == "windows" {
+		// Windows does not ship less. getPagerReal falls back to more, which is
+		// always present in System32, so accept it here. Fail only if neither
+		// pager can be found.
+		require.NotNil(t, pager)
+		assert.Equal(t, "more", pager.getBinary())
+		assert.Empty(t, pager.getFlags())
+	} else {
+		assert.Equal(t, "less", pager.getBinary())
+		assert.Equal(t, []string{}, pager.getFlags())
+	}
 
 	pager = newPagerLess()
 	assert.Equal(t, "less", pager.getBinary())
