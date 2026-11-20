@@ -47,7 +47,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	appKey, err := gittuf.LoadPublicKey(o.appKey)
+	appKey, err := gittuf.LoadPublicKey(repo, o.appKey)
 	if err != nil {
 		return err
 	}

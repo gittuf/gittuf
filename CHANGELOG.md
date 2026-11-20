@@ -2,6 +2,33 @@
 
 This file tracks the changes introduced by gittuf versions.
 
+## v0.18.0
+
+This release fixes various bugs with policy management, and moves
+multi-repository features back into developer mode. This release also fixes
+security vulnerabilities, see the advisories on GitHub for more information.
+
+### Added
+
+- Added support for short reference names in gittuf rsl skip-rewritten and log
+
+### Updated
+
+- Moved multi-repository features back to developer mode
+- Fixed issue with non-ASCII path characters causing incorrect verification
+  results
+- Fixed issue with propagated policy updates not being applied during
+  verification
+- Updated GPG signature verification to ignore expiration issues as key validity
+  is controlled by gittuf policy
+- Git grafts are now ignored by gittuf
+- Policy staging commands now show edits to policy that have not been staged yet
+- Fixed bug where specifying duplicate principals in adding and updating rules
+  could lead to an unsatisfiable rule being applied
+- Fixed bug where the TUI would incorrectly show mergability of a branch
+- Fixed less pager behavior with user-supplied arguments
+- Updated various dependencies and CI workflows
+
 ## v0.17.0
 
 This release addresses a performance issue with verification of data signed with
@@ -106,14 +133,14 @@ in dependencies. See the release notes on GitHub for more information.
 This release improves our testing coverage, makes various improvements across
 the codebase, and removes support for the legacy securesystemslib key format.
 This release also fixes security vulnerabilities, see the advisories on GitHub
-for more information. 
+for more information.
 
 ### Added
 
 - Added support for filtering the RSL by target reference of entries
 - Added testing for gittuf in CI on FreeBSD
 - Added fixes to prevent policy rollback attacks via RSL
-- Added missing validation when loading first policy state 
+- Added missing validation when loading first policy state
 
 ### Updated
 
@@ -348,7 +375,7 @@ Starting with this release, gittuf is now in beta!
 
 ## v0.5.2
 
-- Fixed issue with git-remote-gittuf when force pushing 
+- Fixed issue with git-remote-gittuf when force pushing
 - Fixed issue with git-remote-gittuf not fetching RSL before adding new entries
 - Updated various dependencies
 

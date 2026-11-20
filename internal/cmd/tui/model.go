@@ -477,7 +477,7 @@ func loadRepoCmd(ctx context.Context, o *options) tea.Cmd {
 		var detectedKey string
 		if uninitialized {
 			if o.p != nil && o.p.SigningKey != "" {
-				if key, err := gittuf.LoadPublicKey(o.p.SigningKey); err == nil {
+				if key, err := gittuf.LoadPublicKey(repo, o.p.SigningKey); err == nil {
 					detectedKey = key.ID()
 				} else {
 					detectedKey = o.p.SigningKey

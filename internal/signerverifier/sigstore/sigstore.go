@@ -8,7 +8,6 @@ import (
 	"context"
 	"crypto"
 	"fmt"
-	"log"
 	"log/slog"
 	"time"
 
@@ -66,7 +65,7 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	trustedRoot, err := cosign.TrustedRoot()
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Error getting TUF root: %v", err))
+		slog.Debug("Error getting TUF root", "error", err.Error())
 		return err
 	}
 	slog.Debug("Loaded Sigstore instance's root of trust")
@@ -78,7 +77,7 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	sev, err := verify.NewVerifier(trustedRoot, opts...)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Error creating signed entity verifier: %v", err))
+		slog.Debug("Error creating signed entity verifier", "error", err.Error())
 		return err
 	}
 
@@ -88,13 +87,13 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 		return err
 	}
 	if err := protojson.Unmarshal(extBytes, verificationMaterial); err != nil {
-		slog.Debug(fmt.Sprintf("Error creating verification material: %v", err))
+		slog.Debug("Error creating verification material", "error", err.Error())
 		return err
 	}
 
 	messageSignature := new(protocommon.MessageSignature)
 	if err := protojson.Unmarshal(sig, messageSignature); err != nil {
-		slog.Debug(fmt.Sprintf("Invalid Sigstore signature: %v", err))
+		slog.Debug("Invalid Sigstore signature", "error", err.Error())
 		return err
 	}
 
@@ -109,13 +108,13 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 
 	apiBundle, err := bundle.NewBundle(pbBundle)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Unable to create Sigstore bundle for verification: %v", err))
+		slog.Debug("Unable to create Sigstore bundle for verification", "error", err.Error())
 		return err
 	}
 
 	expectedIdentity, err := verify.NewShortCertificateIdentity(v.issuer, "", v.identity, "")
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Unable to create expected identity constraint: %v", err))
+		slog.Debug("Unable to create expected identity constraint", "error", err.Error())
 		return err
 	}
 
@@ -127,11 +126,11 @@ func (v *Verifier) Verify(_ context.Context, data, sig []byte) error {
 		),
 	)
 	if err != nil {
-		slog.Debug(fmt.Sprintf("Unable to verify Sigstore signature: %v", err))
+		slog.Debug("Unable to verify Sigstore signature", "error", err.Error())
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Verified Sigstore signature issued by '%s' for '%s'", result.VerifiedIdentity.Issuer.Issuer, result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName))
+	slog.Debug("Verified Sigstore signature", "issuer", result.VerifiedIdentity.Issuer.Issuer, "subjectAlternativeName", result.VerifiedIdentity.SubjectAlternativeName.SubjectAlternativeName)
 	return nil
 }
 
@@ -217,7 +216,7 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 
 	bundleJSON, err := protojson.Marshal(bundle)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	return bundleJSON, nil

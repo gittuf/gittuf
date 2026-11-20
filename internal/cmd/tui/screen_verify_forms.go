@@ -15,6 +15,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 	verifymergeableopts "github.com/gittuf/gittuf/experimental/gittuf/options/verifymergeable"
+	"github.com/gittuf/gittuf/internal/logging"
 )
 
 //
@@ -66,7 +67,7 @@ func (s *verifyRefScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 	m.loadingMsg = fmt.Sprintf("Verifying reference %s...", targetRef)
 
 	pr, pw := io.Pipe()
-	logger := slog.New(slog.NewTextHandler(pw, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(logging.NewHandler(pw, slog.LevelDebug))
 	slog.SetDefault(logger)
 
 	scanner := bufio.NewScanner(pr)
@@ -84,7 +85,7 @@ func (s *verifyRefScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 			err := m.repo.VerifyRef(m.ctx, targetRef, opts...)
 
 			// Reset logger
-			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+			slog.SetDefault(slog.New(logging.NewHandler(os.Stderr, slog.LevelInfo)))
 
 			successMsg := fmt.Sprintf("Successfully verified %s!", targetRef)
 			return verifyResultMsg{err: err, successMsg: successMsg}
@@ -144,7 +145,7 @@ func (s *verifyMergeableScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 	m.loadingMsg = fmt.Sprintf("Verifying if %s is mergeable into %s...", featureBranch, baseBranch)
 
 	pr, pw := io.Pipe()
-	logger := slog.New(slog.NewTextHandler(pw, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	logger := slog.New(logging.NewHandler(pw, slog.LevelDebug))
 	slog.SetDefault(logger)
 
 	scanner := bufio.NewScanner(pr)
@@ -161,7 +162,7 @@ func (s *verifyMergeableScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 			needRSLSignature, err := m.repo.VerifyMergeable(m.ctx, baseBranch, featureBranch, opts...)
 
 			// Reset logger
-			slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+			slog.SetDefault(slog.New(logging.NewHandler(os.Stderr, slog.LevelInfo)))
 
 			// The boolean doesn't say whether the merge is possible, a nil
 			// error does. It says whether the merge must be performed by an

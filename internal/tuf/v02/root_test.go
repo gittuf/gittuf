@@ -156,6 +156,29 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, 1, len(directives))
 		assert.Equal(t, updatedDirective, directives[0])
 
+		otherDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.com/git/other-repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "other-upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(otherDirective)
+		assert.NoError(t, err)
+
+		collidingDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.org/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.UpdatePropagationDirective(collidingDirective)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+
+		err = rootMetadata.DeletePropagationDirective("other-test")
+		assert.NoError(t, err)
+
 		err = rootMetadata.DeletePropagationDirective("test")
 		assert.Nil(t, err)
 
@@ -389,7 +412,7 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 
 	verifier, err := ssh.NewVerifierFromKey(sslibKeyO)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	signer := &ssh.Signer{
 		Verifier: verifier,

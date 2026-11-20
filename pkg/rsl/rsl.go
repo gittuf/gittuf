@@ -747,7 +747,7 @@ func GetLatestReferenceUpdaterEntry(storer gitstore.Storer, opts ...GetLatestRef
 		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
 	if options.BeforeEntryNumber != 0 && options.UntilEntryNumber != 0 && options.BeforeEntryNumber < options.UntilEntryNumber {
-		slog.Debug(fmt.Sprintf("Cannot search for entry before entry number %d and until entry number %d, aborting...", options.BeforeEntryNumber, options.UntilEntryNumber))
+		slog.Debug("Cannot search for entry before entry number and until entry number, aborting", "beforeEntryNumber", options.BeforeEntryNumber, "untilEntryNumber", options.UntilEntryNumber)
 		return nil, nil, ErrInvalidGetLatestReferenceUpdaterEntryOptions
 	}
 	if options.IsReferenceEntry && options.IsPropagationEntryForRepository != "" {
@@ -769,7 +769,7 @@ func GetLatestReferenceUpdaterEntry(storer gitstore.Storer, opts ...GetLatestRef
 			return nil, nil, ErrCannotUseEntryNumberFilter
 		}
 	} else if options.UntilEntryNumber != 0 && iteratorT.GetNumber() < options.UntilEntryNumber {
-		slog.Debug(fmt.Sprintf("Latest entry's number %d is less than the until number condition %d, aborting...", iteratorT.GetNumber(), options.UntilEntryNumber))
+		slog.Debug("Latest entry's number is less than the until number condition, aborting", "currentEntryNumber", iteratorT.GetNumber(), "untilEntryNumber", options.UntilEntryNumber)
 		return nil, nil, ErrInvalidUntilEntryNumberCondition
 	}
 
@@ -791,7 +791,7 @@ func GetLatestReferenceUpdaterEntry(storer gitstore.Storer, opts ...GetLatestRef
 			}
 		}
 
-		slog.Debug(fmt.Sprintf("Found entry '%s' matching before condition...", iteratorT.GetID().String()))
+		slog.Debug("Found entry matching before condition", "entryID", iteratorT.GetID().String())
 
 		// we've found the before anchor entry, track it if it's an
 		// annotation
@@ -964,10 +964,10 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 			}
 
 			if !isAncestor {
-				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that does not exist in the target ref.", targetRef, entry.ID, entry.TargetID))
+				slog.Debug("For target ref, found RSL entry pointing to a commit that does not exist in the target ref", "targetRef", targetRef, "entryID", entry.ID, "entryTargetID", entry.TargetID)
 				entriesToSkip = append(entriesToSkip, entry.ID)
 			} else {
-				slog.Debug(fmt.Sprintf("For target ref %s, found RSL entry '%s' pointing to a commit, '%s', that exists in the target ref. No more commits to skip.", targetRef, entry.ID, entry.TargetID))
+				slog.Debug("For target ref, found RSL entry pointing to a commit that exists in the target ref, no more commits to skip", "targetRef", targetRef, "entryID", entry.ID, "entryTargetID", entry.TargetID)
 				break
 			}
 		}

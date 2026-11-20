@@ -49,7 +49,7 @@ func TestInspect(t *testing.T) {
 
 		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
 
-		newKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		newKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		if err != nil {
 			t.Fatal(err)
 		}

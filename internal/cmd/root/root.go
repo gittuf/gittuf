@@ -25,6 +25,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/verifyref"
 	"github.com/gittuf/gittuf/internal/cmd/version"
 	"github.com/gittuf/gittuf/internal/display"
+	"github.com/gittuf/gittuf/internal/logging"
 	"github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 )
@@ -104,14 +105,21 @@ func (o *options) PreRunE(_ *cobra.Command, _ []string) error {
 		display.DisableColor()
 	}
 
-	// Setup logging
-	level := slog.LevelInfo
-	if o.verbose || gittuf.InDebugMode() {
-		level = slog.LevelDebug
+	// Setup logging. Debug mode is aimed at gittuf developers and keeps the
+	// structured TextHandler with timestamps. Otherwise, records are
+	// rendered as plain, human readable lines: the --verbose output of a
+	// CLI is read in a terminal, not parsed as logfmt.
+	if gittuf.InDebugMode() {
+		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
+			Level: slog.LevelDebug,
+		})))
+	} else {
+		level := slog.LevelInfo
+		if o.verbose {
+			level = slog.LevelDebug
+		}
+		slog.SetDefault(slog.New(logging.NewHandler(os.Stderr, level)))
 	}
-	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
-		Level: level,
-	})))
 
 	// Start profiling if flag is set
 	if o.profile {

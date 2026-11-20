@@ -186,7 +186,7 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, p
 				return setupDoneMsg{err: fmt.Errorf("failed to load signer for key '%s': %w", keyRef, err)}
 			}
 
-			keyPrincipal, err = gittuf.LoadPublicKey(keyRef)
+			keyPrincipal, err = gittuf.LoadPublicKey(repo, keyRef)
 			if err != nil {
 				return setupDoneMsg{err: fmt.Errorf("failed to load public key for '%s': %w", keyRef, err)}
 			}

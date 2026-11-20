@@ -88,7 +88,7 @@ func (r *Repository) RecordRSLEntryForReference(ctx context.Context, refName str
 	}
 
 	// The tip of the ref is always from the localRefName
-	slog.Debug(fmt.Sprintf("Loading current state of '%s'...", localRefName))
+	slog.Debug("Loading current state of reference", "refName", localRefName)
 	refTip, err := r.r.GetReference(localRefName)
 	if err != nil {
 		return err
@@ -279,7 +279,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	trackerRef := rsl.RemoteTrackerRef(remoteName)
 	rslRemoteRefSpec := []string{fmt.Sprintf("%s:%s", rsl.Ref, trackerRef)}
 
-	slog.Debug(fmt.Sprintf("Updating remote RSL tracker (%s)...", rslRemoteRefSpec))
+	slog.Debug("Updating remote RSL tracker", "refSpecs", rslRemoteRefSpec)
 	if err := r.r.FetchRefSpec(remoteName, rslRemoteRefSpec); err != nil {
 		return err
 	}
@@ -288,14 +288,14 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	if err != nil {
 		return err
 	}
-	slog.Debug(fmt.Sprintf("Remote RSL is at '%s'", remoteRefState.String()))
+	slog.Debug("Remote RSL is at", "commitID", remoteRefState.String())
 
 	// Load status of the local RSL for comparison
 	localRefState, err := r.r.GetReference(rsl.Ref)
 	if err != nil {
 		return err
 	}
-	slog.Debug(fmt.Sprintf("Local RSL is at '%s'", localRefState.String()))
+	slog.Debug("Local RSL is at", "commitID", localRefState.String())
 
 	// Check if local is nil and exit appropriately
 	if localRefState.IsZero() {
@@ -356,7 +356,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	if err != nil {
 		return err
 	}
-	slog.Debug(fmt.Sprintf("Found common ancestor entry '%s'", commonAncestor.String()))
+	slog.Debug("Found common ancestor RSL entry", "entryID", commonAncestor.String())
 
 	localOnlyEntries, err := getRSLEntriesUntil(r.r, localRefState, commonAncestor)
 	if err != nil {
@@ -369,7 +369,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 
 	localUpdatedRefs := set.NewSet[string]()
 	for _, entry := range localOnlyEntries {
-		slog.Debug(fmt.Sprintf("Identified local only entry that must be reapplied '%s'", entry.GetID().String()))
+		slog.Debug("Identified local only RSL entry that must be reapplied", "entryID", entry.GetID().String())
 		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
 			localUpdatedRefs.Add(entry.RefName)
 		}
@@ -377,7 +377,7 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 
 	remoteUpdatedRefs := set.NewSet[string]()
 	for _, entry := range remoteOnlyEntries {
-		slog.Debug(fmt.Sprintf("Identified remote only entry '%s'", entry.GetID().String()))
+		slog.Debug("Identified remote only RSL entry", "entryID", entry.GetID().String())
 		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
 			remoteUpdatedRefs.Add(entry.RefName)
 		}
@@ -397,8 +397,19 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 
 	// Apply local only entries on top of the new local RSL
 	// localOnlyEntries is in reverse order
+	//
+	// Reapplying an entry changes its parent and/or its RSL number, so it is
+	// committed with a new ID. Annotation entries refer to the entries they
+	// annotate by ID, so as we replay entries here, we track how each
+	// original entry's ID maps to the new ID it is assigned, and rewrite an
+	// annotation's referenced IDs using that mapping. Otherwise, an annotation
+	// on a reapplied entry (a skip or just a message) would silently stop
+	// applying to it, as it would still refer to the original entry's now
+	// unreachable ID.
+	oldToNewEntryID := map[string]githash.Hash{}
 	for i := len(localOnlyEntries) - 1; i >= 0; i-- {
-		slog.Debug(fmt.Sprintf("Reapplying entry '%s'...", localOnlyEntries[i].GetID().String()))
+		originalEntryID := localOnlyEntries[i].GetID()
+		slog.Debug("Reapplying RSL entry", "entryID", originalEntryID.String())
 
 		// We create a new object so as to apply anything the
 		// entry may contain that is inferred at commit time
@@ -409,20 +420,33 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		switch entry := localOnlyEntries[i].(type) {
 		case *rsl.ReferenceEntry:
 			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply reference entry '%s': %w", entry.ID.String(), err)
+				return fmt.Errorf("unable to reapply reference entry '%s': %w", originalEntryID.String(), err)
 			}
 		case *rsl.AnnotationEntry:
-			if err := rsl.NewAnnotationEntry(entry.RSLEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
-				return fmt.Errorf("unable to reapply annotation entry '%s': %w", entry.ID.String(), err)
+			rslEntryIDs := make([]githash.Hash, 0, len(entry.RSLEntryIDs))
+			for _, id := range entry.RSLEntryIDs {
+				if newID, ok := oldToNewEntryID[id.String()]; ok {
+					// The annotated entry was itself reapplied earlier in
+					// this loop and was assigned a new ID; the annotation
+					// must follow it rather than the stale ID.
+					id = newID
+				}
+				rslEntryIDs = append(rslEntryIDs, id)
+			}
+
+			if err := rsl.NewAnnotationEntry(rslEntryIDs, entry.Skip, entry.Message, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
+				return fmt.Errorf("unable to reapply annotation entry '%s': %w", originalEntryID.String(), err)
 			}
 		}
 
+		currentTip, err := r.r.GetReference(rsl.Ref)
+		if err != nil {
+			return fmt.Errorf("unable to get current tip of the RSL: %w", err)
+		}
+		oldToNewEntryID[originalEntryID.String()] = currentTip
+
 		if slog.Default().Enabled(ctx, slog.LevelDebug) {
-			currentTip, err := r.r.GetReference(rsl.Ref)
-			if err != nil {
-				return fmt.Errorf("unable to get current tip of the RSL: %w", err)
-			}
-			slog.Debug("New entry ID for '%s' is '%s'", localOnlyEntries[i].GetID().String(), currentTip.String())
+			slog.Debug("Reapplied RSL entry has new ID", "originalEntryID", originalEntryID.String(), "newEntryID", currentTip.String())
 		}
 	}
 
@@ -462,7 +486,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	trackerRef := rsl.RemoteTrackerRef(remoteName)
 	rslRemoteRefSpec := []string{fmt.Sprintf("%s:%s", rsl.Ref, trackerRef)}
 
-	slog.Debug(fmt.Sprintf("Updating remote RSL tracker (%s)...", rslRemoteRefSpec))
+	slog.Debug("Updating remote RSL tracker", "refSpecs", rslRemoteRefSpec)
 	if err := r.r.FetchRefSpec(remoteName, rslRemoteRefSpec); err != nil {
 		return nil, err
 	}
@@ -472,14 +496,14 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Remote RSL is at '%s'", remoteRefState.String()))
+	slog.Debug("Remote RSL is at", "commitID", remoteRefState.String())
 
 	// Load status of the local RSL for comparison
 	localRefState, err := r.r.GetReference(rsl.Ref)
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Local RSL is at '%s'", localRefState.String()))
+	slog.Debug("Local RSL is at", "commitID", localRefState.String())
 
 	// Check if equal and exit early if true
 	if remoteRefState.Equal(localRefState) {
@@ -541,21 +565,21 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 		divergedRefs := []string{}
 		for refName, remoteTip := range remoteUpdatedRefTips {
 			// Find local tip for same ref
-			slog.Debug(fmt.Sprintf("Inspecting state of '%s' locally...", refName))
+			slog.Debug("Inspecting state of reference locally", "refName", refName)
 			localTip, err := r.r.GetReference(refName)
 			if err != nil {
 				if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
 					return nil, err
 				}
 
-				slog.Debug(fmt.Sprintf("Reference '%s' does not exist locally", refName))
+				slog.Debug("Reference does not exist locally", "refName", refName)
 				continue
 			}
 
 			// Fetch remote objects for each ref
 			if !r.r.HasObject(remoteTip) {
 				if err := r.r.FetchObject(remoteName, remoteTip); err != nil {
-					slog.Debug(fmt.Sprintf("Unable to fetch object '%s', aborting...", remoteTip.String()))
+					slog.Debug("Unable to fetch object, aborting", "objectID", remoteTip.String())
 					return nil, err
 				}
 			}
@@ -589,7 +613,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 
 		if len(divergedRefs) != 0 {
 			if !overwriteLocalRefs {
-				slog.Debug(fmt.Sprintf("Local references have diverged from upstream repository: [%s]", strings.Join(divergedRefs, ", ")))
+				slog.Debug("Local references have diverged from upstream repository", "divergedRefs", divergedRefs)
 				return divergedRefs, ErrDivergedRefs
 			}
 
@@ -622,7 +646,7 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Found common ancestor entry '%s'", commonAncestor.String()))
+	slog.Debug("Found common ancestor RSL entry", "entryID", commonAncestor.String())
 
 	remoteOnlyEntries, err := getRSLEntriesUntil(r.r, remoteRefState, commonAncestor)
 	if err != nil {
@@ -637,21 +661,21 @@ func (r *Repository) sync(remoteName string, overwriteLocalRefs bool) ([]string,
 	divergedRefs := []string{}
 	for refName, remoteTip := range remoteUpdatedRefTips {
 		// Find local tip for same ref
-		slog.Debug(fmt.Sprintf("Inspecting state of '%s' locally...", refName))
+		slog.Debug("Inspecting state of reference locally", "refName", refName)
 		localTip, err := r.r.GetReference(refName)
 		if err != nil {
 			if !errors.Is(err, gitinterface.ErrReferenceNotFound) {
 				return nil, err
 			}
 
-			slog.Debug(fmt.Sprintf("Reference '%s' does not exist locally", refName))
+			slog.Debug("Reference does not exist locally", "refName", refName)
 			continue
 		}
 
 		// Fetch remote objects for each ref
 		if !r.r.HasObject(remoteTip) {
 			if err := r.r.FetchObject(remoteName, remoteTip); err != nil {
-				slog.Debug(fmt.Sprintf("Unable to fetch object '%s', aborting...", remoteTip.String()))
+				slog.Debug("Unable to fetch object, aborting", "objectID", remoteTip.String())
 				return nil, err
 			}
 		}
@@ -745,6 +769,8 @@ func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash
 			if _, has := refTips[entry.GetRefName()]; has {
 				continue
 			}
+
+			refTips[entry.GetRefName()] = entry.GetTargetID()
 		case *rsl.AnnotationEntry:
 			for _, referencedEntryID := range entry.RSLEntryIDs {
 				if _, has := annotationsMap[referencedEntryID.String()]; !has {
@@ -761,7 +787,7 @@ func getLatestRefTipsFromRSLEntries(entries []rsl.Entry) map[string]githash.Hash
 // PushRSL pushes the local RSL to the specified remote. As this push defaults
 // to fast-forward only, divergent RSL states are detected.
 func (r *Repository) PushRSL(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pushing RSL reference to '%s'...", remoteName))
+	slog.Debug("Pushing RSL reference to remote", "remoteName", remoteName)
 	if err := r.r.Push(remoteName, []string{rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingRSL, err)
 	}
@@ -772,7 +798,7 @@ func (r *Repository) PushRSL(remoteName string) error {
 // PullRSL pulls RSL contents from the specified remote to the local RSL. The
 // fetch is marked as fast forward only to detect RSL divergence.
 func (r *Repository) PullRSL(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pulling RSL reference from '%s'...", remoteName))
+	slog.Debug("Pulling RSL reference from remote", "remoteName", remoteName)
 	if err := r.r.Fetch(remoteName, []string{rsl.Ref}, true); err != nil {
 		return errors.Join(ErrPullingRSL, err)
 	}
@@ -901,7 +927,7 @@ func (r *Repository) PropagateChangesFromUpstreamRepositories(ctx context.Contex
 	}
 
 	for upstreamRepositoryURL, directives := range upstreamRepositoryDirectivesMapping {
-		slog.Debug(fmt.Sprintf("Propagating changes from repository '%s'...", upstreamRepositoryURL))
+		slog.Debug("Propagating changes from upstream repository", "repositoryLocation", upstreamRepositoryURL)
 		upstreamRepositoryLocation, err := os.MkdirTemp("", "gittuf-propagate-upstream")
 		if err != nil {
 			return err
