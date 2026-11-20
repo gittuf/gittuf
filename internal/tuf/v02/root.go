@@ -317,7 +317,12 @@ func (r *RootMetadata) GetRootPrincipals() ([]tuf.Principal, error) {
 
 	principals := make([]tuf.Principal, 0, role.PrincipalIDs.Len())
 	for _, id := range role.PrincipalIDs.Contents() {
-		principals = append(principals, r.Principals[id])
+		principal, has := r.Principals[id]
+		if !has {
+			return nil, tuf.ErrPrincipalNotFound
+		}
+
+		principals = append(principals, principal)
 	}
 
 	return principals, nil
@@ -344,7 +349,12 @@ func (r *RootMetadata) GetPrimaryRuleFilePrincipals() ([]tuf.Principal, error) {
 
 	principals := make([]tuf.Principal, 0, role.PrincipalIDs.Len())
 	for _, id := range role.PrincipalIDs.Contents() {
-		principals = append(principals, r.Principals[id])
+		principal, has := r.Principals[id]
+		if !has {
+			return nil, tuf.ErrPrincipalNotFound
+		}
+
+		principals = append(principals, principal)
 	}
 
 	return principals, nil
@@ -372,7 +382,12 @@ func (r *RootMetadata) GetGitHubAppPrincipals(appName string) ([]tuf.Principal, 
 
 	principals := make([]tuf.Principal, 0, entry.PrincipalIDs.Len())
 	for _, id := range entry.PrincipalIDs.Contents() {
-		principals = append(principals, r.Principals[id])
+		principal, has := r.Principals[id]
+		if !has {
+			return nil, tuf.ErrPrincipalNotFound
+		}
+
+		principals = append(principals, principal)
 	}
 
 	return principals, nil
