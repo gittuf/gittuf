@@ -168,7 +168,7 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
-	t.Run("no recovery, first entry is the very first entry but policy is not applied", func(t *testing.T) {
+	t.Run("no recovery, first entry is the very first entry but policy is not applied until later", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicyUsingPersons)
 		currentRSLTip, err := repo.GetReference(rsl.Ref)
 		if err != nil {
@@ -190,14 +190,46 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
 		entry := rsl.NewReferenceEntry(refName, commitIDs[0])
-		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
 		entry.ID = entryID
 
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.ErrorIs(t, err, ErrPolicyNotFound)
+		assert.NoError(t, err, ErrPolicyNotFound)
+
+		// Apply the policy
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Make authorized commit
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.NoError(t, err)
+
+		// Make unauthorized commit
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
@@ -2331,7 +2363,7 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
-	t.Run("no recovery, first entry is the very first entry but policy is not applied", func(t *testing.T) {
+	t.Run("no recovery, first entry is the very first entry but policy is not applied until later", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		currentRSLTip, err := repo.GetReference(rsl.Ref)
 		if err != nil {
@@ -2360,7 +2392,39 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
-		assert.ErrorIs(t, err, ErrPolicyNotFound)
+		assert.NoError(t, err)
+
+		// Apply the policy
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		// Make authorized commit
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
+		entry.ID = entryID
+
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.NoError(t, err)
+
+		// Make unauthorized commit
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgUnauthorizedKeyBytes)
+		entry = rsl.NewReferenceEntry(refName, commitIDs[0])
+		entryID = common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgUnauthorizedKeyBytes)
+		entry.ID = entryID
+
+		verifier = NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
 	})
 
 	t.Run("invalidly signed metadata in policy transition", func(t *testing.T) {
