@@ -14,6 +14,13 @@ import (
 )
 
 func main() {
+	os.Exit(run())
+}
+
+// run executes the gittuf command and returns the exit code. The cleanup is
+// deferred here rather than in main so that it also runs when the command
+// fails, since deferred functions do not run under os.Exit.
+func run() (exitCode int) {
 	defer func() {
 		if err := profile.StopProfiling(); err != nil {
 			fmt.Fprintf(os.Stderr, "unexpected profiling error: %s\n", err.Error())
@@ -26,23 +33,22 @@ func main() {
 			debug.PrintStack()
 			fmt.Fprintln(os.Stderr, "\nPlease consider filing a bug on https://github.com/gittuf/gittuf/issues with the stack trace and steps to reproduce this state. Thanks!")
 
-			os.Exit(1) // this is the last possible deferred function to run
+			exitCode = 1
 		}
 	}()
 
 	rootCmd := root.New()
 	if err := rootCmd.Execute(); err != nil {
-		// Deferred functions do not run under os.Exit, so report here too. It
-		// emits at most once.
+		// Report the storer trace before the upgrade guidance so that the
+		// guidance is the last thing printed. It emits at most once.
 		root.ReportStorerTrace(os.Stderr)
 
 		if root.IsUpgradeRequiredError(err) {
 			fmt.Fprintf(os.Stderr, "\n%s\nThis client is gittuf %s.\n", root.UpgradeGuidance, version.GetVersion())
 		}
 
-		// We can ignore the linter here (deferred functions are not executed
-		// when os.Exit is invoked) because if we do have an error, we don't
-		// have a panic, which is what the deferred function is looking for.
-		os.Exit(1) //nolint:gocritic
+		return 1
 	}
+
+	return 0
 }
