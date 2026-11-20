@@ -27,12 +27,13 @@ func TestNewSetupWizard(t *testing.T) {
 	assert.Equal(t, "main", wizard.branchInput.Value())
 	assert.Contains(t, wizard.keyInput.Placeholder, "fulcio:")
 
-	t.Run("detects key from Git config", func(t *testing.T) {
+	t.Run("detects key and user.name from Git config", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
 		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGFormat), "x509"))
 		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigGPGX509Program), "gitsign"))
 		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserSigningKey), "dev@example.com::https://accounts.google.com"))
+		require.NoError(t, gitRepo.SetGitConfig(string(gitstore.ConfigUserName), "Jane Doe"))
 
 		t.Chdir(tmpDir)
 		repo, err := gittuf.LoadRepository(".")
@@ -41,6 +42,8 @@ func TestNewSetupWizard(t *testing.T) {
 		w := newSetupWizard(repo, "")
 		assert.Equal(t, "dev@example.com::https://accounts.google.com", w.gitConfigKey)
 		assert.Equal(t, "dev@example.com::https://accounts.google.com", w.selectedKey)
+		assert.Equal(t, "Jane-Doe", w.principalName)
+		assert.Equal(t, "Jane-Doe", w.personInput.Value())
 	})
 }
 
@@ -95,13 +98,13 @@ func TestUpdateSetupWizardGuidedFlow(t *testing.T) {
 	m = res.(model)
 	assert.Equal(t, 0, m.setupWizard.keyCursor)
 
-	// Selecting option 0 (Use key from Git config) advances to Branch step
+	// Selecting option 0 (Use key from Git config) advances to Principal step
 	res, _ = m.updateSetupWizard(tea.KeyMsg{Type: tea.KeyEnter})
 	m = res.(model)
-	assert.Equal(t, wizardStepBranch, m.setupWizard.step)
+	assert.Equal(t, wizardStepPrincipal, m.setupWizard.step)
 	assert.Equal(t, "test-key.pub", m.setupWizard.selectedKey)
 
-	// Esc from Branch returns to Key step
+	// Esc from Principal returns to Key step
 	res, _ = m.updateSetupWizard(tea.KeyMsg{Type: tea.KeyEsc})
 	m = res.(model)
 	assert.Equal(t, wizardStepKey, m.setupWizard.step)
@@ -113,12 +116,19 @@ func TestUpdateSetupWizardGuidedFlow(t *testing.T) {
 	m = res.(model)
 	assert.Equal(t, wizardStepCustomKeyInput, m.setupWizard.step)
 
-	// Enter custom key path and confirm -> Branch step
+	// Enter custom key path and confirm -> Principal step
 	m.setupWizard.keyInput.SetValue("/custom/path/key.pub")
 	res, _ = m.updateSetupWizard(tea.KeyMsg{Type: tea.KeyEnter})
 	m = res.(model)
-	assert.Equal(t, wizardStepBranch, m.setupWizard.step)
+	assert.Equal(t, wizardStepPrincipal, m.setupWizard.step)
 	assert.Equal(t, "/custom/path/key.pub", m.setupWizard.selectedKey)
+
+	// Enter principal name and confirm -> Branch step
+	m.setupWizard.personInput.SetValue("jane-doe")
+	res, _ = m.updateSetupWizard(tea.KeyMsg{Type: tea.KeyEnter})
+	m = res.(model)
+	assert.Equal(t, wizardStepBranch, m.setupWizard.step)
+	assert.Equal(t, "jane-doe", m.setupWizard.principalName)
 
 	// Confirm branch -> Applying step
 	m.setupWizard.branchInput.SetValue("refs/heads/develop")
@@ -231,12 +241,19 @@ func TestRenderSetupWizardDialog(t *testing.T) {
 	assert.Contains(t, outKey, "Select Signing Key")
 	assert.Contains(t, outKey, "Override signing key")
 
+	// Principal step
+	m.setupWizard.step = wizardStepPrincipal
+	outPrincipal := renderSetupWizardDialog(m)
+	assert.Contains(t, outPrincipal, "Enter Principal Name")
+
 	// Branch step shows policy summary
 	m.setupWizard.step = wizardStepBranch
+	m.setupWizard.principalName = "jane-doe"
 	outBranch := renderSetupWizardDialog(m)
 	assert.Contains(t, outBranch, "Confirm Protected Branch & Policy")
 	assert.Contains(t, outBranch, "Root of Trust")
 	assert.Contains(t, outBranch, "Top-Level Policy")
+	assert.Contains(t, outBranch, "jane-doe")
 
 	// Applying step
 	m.setupWizard.step = wizardStepApplying

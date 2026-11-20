@@ -75,6 +75,7 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.readOnly = false
 		m.policyRulesScreen.rules = getCurrRules(m.ctx, m.options)
 		m.policyRulesScreen.updateRuleList()
+		m.policyPrincipalsScreen.refreshPrincipals(m.ctx, m.options)
 		m.trustGlobalRulesScreen.globalRules = getGlobalRules(m.ctx, m.options)
 		m.trustGlobalRulesScreen.updateGlobalRuleList()
 		m.applyReadOnlyMenus()

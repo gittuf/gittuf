@@ -18,6 +18,8 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/third_party/go-securesystemslib/dsse"
 	"github.com/gittuf/gittuf/internal/tuf"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
+	"github.com/gittuf/gittuf/pkg/gitstore"
 )
 
 type wizardStep int
@@ -26,6 +28,7 @@ const (
 	wizardStepOverview wizardStep = iota
 	wizardStepKey
 	wizardStepCustomKeyInput
+	wizardStepPrincipal
 	wizardStepBranch
 	wizardStepApplying
 	wizardStepComplete
@@ -33,16 +36,18 @@ const (
 )
 
 type setupWizardModel struct {
-	step         wizardStep
-	gitConfigKey string
-	selectedKey  string
-	keyCursor    int
-	targetBranch string
-	branchInput  textinput.Model
-	keyInput     textinput.Model
-	spinner      spinner.Model
-	applyingMsg  string
-	err          error
+	step          wizardStep
+	gitConfigKey  string
+	selectedKey   string
+	keyCursor     int
+	principalName string
+	targetBranch  string
+	personInput   textinput.Model
+	branchInput   textinput.Model
+	keyInput      textinput.Model
+	spinner       spinner.Model
+	applyingMsg   string
+	err           error
 }
 
 // setupDoneMsg is sent when policy bootstrapping completes.
@@ -85,15 +90,25 @@ var (
 )
 
 func newSetupWizard(repo *gittuf.Repository, detectedKey string) setupWizardModel {
-	if detectedKey == "" && repo != nil {
-		if key, err := gittuf.LoadPublicKeyFromGitConfig(repo); err == nil {
-			detectedKey = key.ID()
+	var defaultPersonID string
+	if repo != nil {
+		if detectedKey == "" {
+			if key, err := gittuf.LoadPublicKeyFromGitConfig(repo); err == nil {
+				detectedKey = key.ID()
+			}
+		}
+		if name, ok, err := repo.GetStorer().LookupConfig(gitstore.ConfigUserName); err == nil && ok {
+			defaultPersonID = strings.Join(strings.Fields(name), "-")
 		}
 	}
 
 	s := spinner.New()
 	s.Spinner = spinner.MiniDot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(colorSuccessMsg))
+
+	pi := textinput.New()
+	pi.Placeholder = "e.g. jane-doe"
+	pi.SetValue(defaultPersonID)
 
 	bi := textinput.New()
 	bi.Placeholder = "e.g. main"
@@ -104,14 +119,16 @@ func newSetupWizard(repo *gittuf.Repository, detectedKey string) setupWizardMode
 	ki.SetValue(detectedKey)
 
 	return setupWizardModel{
-		step:         wizardStepOverview,
-		gitConfigKey: detectedKey,
-		selectedKey:  detectedKey,
-		keyCursor:    0,
-		targetBranch: "main",
-		branchInput:  bi,
-		keyInput:     ki,
-		spinner:      s,
+		step:          wizardStepOverview,
+		gitConfigKey:  detectedKey,
+		selectedKey:   detectedKey,
+		keyCursor:     0,
+		principalName: defaultPersonID,
+		targetBranch:  "main",
+		personInput:   pi,
+		branchInput:   bi,
+		keyInput:      ki,
+		spinner:       s,
 	}
 }
 
@@ -135,22 +152,26 @@ func hasPolicyOrStaging(repo *gittuf.Repository) bool {
 
 // applySetupPolicyCmd coordinates initializing the root of trust, top-level
 // targets policy, and branch protection rule.
-func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, branchName string) tea.Cmd {
+func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, principalName, branchName string) tea.Cmd {
 	return func() tea.Msg {
 		branchName = strings.TrimPrefix(strings.TrimSpace(branchName), "refs/heads/")
 		if branchName == "" {
 			branchName = "main"
 		}
+		principalName = strings.Join(strings.Fields(principalName), "-")
+		if principalName == "" {
+			return setupDoneMsg{err: errors.New("no principal name specified")}
+		}
 
 		var (
-			signer     dsse.SignerVerifier
-			principal  tuf.Principal
-			signingKey string
-			err        error
+			signer       dsse.SignerVerifier
+			keyPrincipal tuf.Principal
+			signingKey   string
+			err          error
 		)
 
 		if gitKey, gitErr := gittuf.LoadPublicKeyFromGitConfig(repo); gitErr == nil && (keyRef == "" || keyRef == gitKey.ID()) {
-			principal = gitKey
+			keyPrincipal = gitKey
 			signer, err = gittuf.LoadSignerFromGitConfig(repo)
 			if err != nil {
 				return setupDoneMsg{err: fmt.Errorf("failed to load signer from Git config: %w", err)}
@@ -165,11 +186,21 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, b
 				return setupDoneMsg{err: fmt.Errorf("failed to load signer for key '%s': %w", keyRef, err)}
 			}
 
-			principal, err = gittuf.LoadPublicKey(keyRef)
+			keyPrincipal, err = gittuf.LoadPublicKey(keyRef)
 			if err != nil {
 				return setupDoneMsg{err: fmt.Errorf("failed to load public key for '%s': %w", keyRef, err)}
 			}
 			signingKey = keyRef
+		}
+
+		key, ok := keyPrincipal.(*tufv02.Key)
+		if !ok {
+			return setupDoneMsg{err: errors.New("unexpected public key principal type")}
+		}
+
+		person := &tufv02.Person{
+			PersonID:   principalName,
+			PublicKeys: map[string]*tufv02.Key{key.ID(): key},
 		}
 
 		// 1. Initialize Root of Trust
@@ -178,7 +209,7 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, b
 		}
 
 		// 2. Add Top-Level Targets Key
-		if err := repo.AddTopLevelTargetsKey(ctx, signer, principal, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := repo.AddTopLevelTargetsKey(ctx, signer, keyPrincipal, false, trustpolicyopts.WithRSLEntry()); err != nil {
 			return setupDoneMsg{err: fmt.Errorf("failed to add top-level targets key: %w", err)}
 		}
 
@@ -187,15 +218,15 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, b
 			return setupDoneMsg{err: fmt.Errorf("failed to initialize targets: %w", err)}
 		}
 
-		// 4. Authorize Principal in Targets
-		if err := repo.AddPrincipalToTargets(ctx, signer, policy.TargetsRoleName, []tuf.Principal{principal}, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		// 4. Authorize Person Principal in Targets
+		if err := repo.AddPrincipalToTargets(ctx, signer, policy.TargetsRoleName, []tuf.Principal{person}, false, trustpolicyopts.WithRSLEntry()); err != nil {
 			return setupDoneMsg{err: fmt.Errorf("failed to authorize principal in targets: %w", err)}
 		}
 
 		// 5. Add Branch Protection Delegation
 		ruleName := "protect-" + branchName
 		rulePattern := "git:refs/heads/" + branchName
-		if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, ruleName, []string{principal.ID()}, []string{rulePattern}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
+		if err := repo.AddDelegation(ctx, signer, policy.TargetsRoleName, ruleName, []string{person.ID()}, []string{rulePattern}, 1, false, trustpolicyopts.WithRSLEntry()); err != nil {
 			return setupDoneMsg{err: fmt.Errorf("failed to create branch protection rule: %w", err)}
 		}
 
@@ -262,8 +293,8 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case "enter":
 			if hasGitKey && m.setupWizard.keyCursor == 0 {
 				m.setupWizard.selectedKey = m.setupWizard.gitConfigKey
-				m.setupWizard.step = wizardStepBranch
-				m.setupWizard.branchInput.Focus()
+				m.setupWizard.step = wizardStepPrincipal
+				m.setupWizard.personInput.Focus()
 				return m, textinput.Blink
 			}
 			m.setupWizard.step = wizardStepCustomKeyInput
@@ -280,8 +311,8 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			val := strings.TrimSpace(m.setupWizard.keyInput.Value())
 			if val != "" {
 				m.setupWizard.selectedKey = val
-				m.setupWizard.step = wizardStepBranch
-				m.setupWizard.branchInput.Focus()
+				m.setupWizard.step = wizardStepPrincipal
+				m.setupWizard.personInput.Focus()
 				return m, textinput.Blink
 			}
 			return m, nil
@@ -291,11 +322,32 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 
-	case wizardStepBranch:
+	case wizardStepPrincipal:
 		switch msg.String() {
 		case "esc":
 			m.setupWizard.step = wizardStepKey
 			return m, nil
+		case "enter":
+			val := strings.Join(strings.Fields(m.setupWizard.personInput.Value()), "-")
+			if val != "" {
+				m.setupWizard.principalName = val
+				m.setupWizard.step = wizardStepBranch
+				m.setupWizard.branchInput.Focus()
+				return m, textinput.Blink
+			}
+			return m, nil
+		default:
+			var cmd tea.Cmd
+			m.setupWizard.personInput, cmd = m.setupWizard.personInput.Update(msg)
+			return m, cmd
+		}
+
+	case wizardStepBranch:
+		switch msg.String() {
+		case "esc":
+			m.setupWizard.step = wizardStepPrincipal
+			m.setupWizard.personInput.Focus()
+			return m, textinput.Blink
 		case "enter":
 			val := strings.TrimPrefix(strings.TrimSpace(m.setupWizard.branchInput.Value()), "refs/heads/")
 			if val == "" {
@@ -306,7 +358,7 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setupWizard.applyingMsg = fmt.Sprintf("Initializing gittuf policy & protecting '%s'...", m.setupWizard.targetBranch)
 			return m, tea.Batch(
 				m.setupWizard.spinner.Tick,
-				applySetupPolicyCmd(m.ctx, m.repo, m.setupWizard.selectedKey, m.setupWizard.targetBranch),
+				applySetupPolicyCmd(m.ctx, m.repo, m.setupWizard.selectedKey, m.setupWizard.principalName, m.setupWizard.targetBranch),
 			)
 		default:
 			var cmd tea.Cmd
@@ -375,7 +427,7 @@ func renderSetupWizardDialog(m model) string {
 
 	case wizardStepKey:
 		var items []string
-		items = append(items, setupTitleStyle.Render("Step 1 of 2: Select Signing Key"), "")
+		items = append(items, setupTitleStyle.Render("Step 1 of 3: Select Signing Key"), "")
 
 		var labels []string
 		if w.gitConfigKey != "" {
@@ -415,10 +467,20 @@ func renderSetupWizardDialog(m model) string {
 
 	case wizardStepCustomKeyInput:
 		content = lipgloss.JoinVertical(lipgloss.Left,
-			setupTitleStyle.Render("Step 1 of 2: Override Signing Key"),
+			setupTitleStyle.Render("Step 1 of 3: Override Signing Key"),
 			setupDescStyle.Render("Enter path to SSH key, GPG key (gpg:KEYID), or Sigstore (fulcio:IDENTITY::ISSUER):"),
 			"",
 			w.keyInput.View(),
+			"",
+			setupFooterStyle.Render("Press <enter> to confirm   |   <esc> back"),
+		)
+
+	case wizardStepPrincipal:
+		content = lipgloss.JoinVertical(lipgloss.Left,
+			setupTitleStyle.Render("Step 2 of 3: Enter Principal Name"),
+			setupDescStyle.Render("Enter a name (Person ID) for the principal to be added to the policy:"),
+			"",
+			w.personInput.View(),
 			"",
 			setupFooterStyle.Render("Press <enter> to confirm   |   <esc> back"),
 		)
@@ -429,9 +491,10 @@ func renderSetupWizardDialog(m model) string {
 			branchPreview = "main"
 		}
 		keyLabel := w.selectedKey
+		personLabel := w.principalName
 
 		content = lipgloss.JoinVertical(lipgloss.Left,
-			setupTitleStyle.Render("Step 2 of 2: Confirm Protected Branch & Policy"),
+			setupTitleStyle.Render("Step 3 of 3: Confirm Protected Branch & Policy"),
 			setupDescStyle.Render("Enter the branch name to protect and review the policy to be applied:"),
 			"",
 			w.branchInput.View(),
@@ -439,6 +502,7 @@ func renderSetupWizardDialog(m model) string {
 			setupMutedStyle.Render("Policy summary to be applied:"),
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Root of Trust:   "), setupHighlightStyle.Render(keyLabel+" (threshold: 1)")),
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Top-Level Policy:"), setupHighlightStyle.Render(keyLabel+" (threshold: 1)")),
+			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Policy Principal:"), setupHighlightStyle.Render(fmt.Sprintf("%s (%s)", personLabel, keyLabel))),
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Branch Rule:     "), setupHighlightStyle.Render(fmt.Sprintf("protect-%s -> git:refs/heads/%s", branchPreview, branchPreview))),
 			"",
 			setupFooterStyle.Render("Press <enter> to apply policy   |   <esc> back"),
@@ -462,6 +526,7 @@ func renderSetupWizardDialog(m model) string {
 			"",
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Root of Trust:   "), setupHighlightStyle.Render("Initialized with "+keyLabel+" (threshold: 1)")),
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Top-Level Policy:"), setupHighlightStyle.Render("Initialized 'targets' role with "+keyLabel+" (threshold: 1)")),
+			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Policy Principal:"), setupHighlightStyle.Render(fmt.Sprintf("%s (%s)", w.principalName, keyLabel))),
 			fmt.Sprintf("  %s %s", setupMutedStyle.Render("Protected Branch:"), setupHighlightStyle.Render(fmt.Sprintf("git:refs/heads/%s (rule: protect-%s)", w.targetBranch, w.targetBranch))),
 			"",
 			setupFooterStyle.Render("Press <enter> to open TUI   |   <q> to quit"),

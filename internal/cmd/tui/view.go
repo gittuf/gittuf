@@ -392,7 +392,7 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 			helpPairs = [][2]string{{"enter", "retry"}, {"esc", "skip to read-only"}, {"q", "quit"}}
 		case wizardStepComplete:
 			helpPairs = [][2]string{{"enter", "open TUI"}, {"q", "quit"}}
-		case wizardStepCustomKeyInput, wizardStepBranch:
+		case wizardStepCustomKeyInput, wizardStepPrincipal, wizardStepBranch:
 			helpPairs = [][2]string{{"enter", "confirm"}, {"esc", "back"}}
 		case wizardStepKey:
 			helpPairs = [][2]string{{"enter", "select"}, {"↑/↓", "navigate"}, {"esc", "back"}}
