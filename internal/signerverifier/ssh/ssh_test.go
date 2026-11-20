@@ -6,6 +6,7 @@ package ssh
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"runtime"
 	"strings"
@@ -53,6 +54,9 @@ func TestSSH(t *testing.T) {
 	for _, test := range tests {
 		keyPath := filepath.Join(tmpDir, test.keyName)
 		if err := os.WriteFile(keyPath, test.keyBytes, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if err := PrepareTestKeyFile(keyPath); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -208,4 +212,34 @@ func TestNewVerifierFromKey(t *testing.T) {
 
 		assert.ErrorContains(t, err, "failed to parse ssh public key material")
 	})
+}
+
+func TestPrepareKeyFileForSigning(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("skipping Windows-specific permission test")
+	}
+
+	keyPath := filepath.Join(t.TempDir(), "test-key")
+	if err := os.WriteFile(keyPath, artifacts.SSHRSAPrivate, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	// Loosen permissions to simulate broad or inherited group access (e.g. BUILTIN\Users)
+	cmd := exec.Command("icacls", keyPath, "/grant", "*S-1-5-32-545:R") //nolint:gosec
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("failed to loosen permissions: %v: %s", err, string(output))
+	}
+
+	err := PrepareTestKeyFile(keyPath)
+	assert.NoError(t, err)
+
+	// Verify that broad groups (BUILTIN\Users, Authenticated Users) are no longer listed in icacls
+	outCmd := exec.Command("icacls", keyPath) //nolint:gosec
+	out, err := outCmd.CombinedOutput()
+	assert.NoError(t, err)
+
+	outStr := string(out)
+	assert.NotContains(t, outStr, "BUILTIN\\Users")
+	assert.NotContains(t, outStr, "Authenticated Users")
+	assert.NotContains(t, outStr, "S-1-5-32-545")
 }
