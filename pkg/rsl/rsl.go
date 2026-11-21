@@ -14,6 +14,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -1118,8 +1119,8 @@ func GetReferenceUpdaterEntriesInRangeForRef(storer gitstore.Storer, firstID, la
 	// Process annotations in reverse order so that annotations are listed in
 	// order of occurrence in the map
 	annotationMap := map[string][]*AnnotationEntry{}
-	for i := len(allAnnotations) - 1; i >= 0; i-- {
-		annotation := allAnnotations[i]
+	for _, annotation := range slices.Backward(allAnnotations) {
+
 		for _, entryID := range annotation.RSLEntryIDs {
 			if _, relevant := inRange[entryID.String()]; relevant {
 				// Annotation is relevant because the entry it refers to was in
@@ -1136,8 +1137,8 @@ func GetReferenceUpdaterEntriesInRangeForRef(storer gitstore.Storer, firstID, la
 	// Reverse entryStack so that it's in order of occurrence rather than in
 	// order of walking back the RSL
 	allEntries := make([]ReferenceUpdaterEntry, 0, len(entryStack))
-	for i := len(entryStack) - 1; i >= 0; i-- {
-		allEntries = append(allEntries, entryStack[i])
+	for _, e := range slices.Backward(entryStack) {
+		allEntries = append(allEntries, e)
 	}
 
 	return allEntries, annotationMap, nil
@@ -1487,7 +1488,6 @@ func setNumber(dst *uint64, value string) error {
 func filterAnnotationsForRelevantAnnotations(allAnnotations []*AnnotationEntry, entryID githash.Hash) []*AnnotationEntry {
 	annotations := []*AnnotationEntry{}
 	for _, annotation := range allAnnotations {
-		annotation := annotation
 		if annotation.RefersTo(entryID) {
 			annotations = append(annotations, annotation)
 		}

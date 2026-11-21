@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -174,10 +175,8 @@ func (s *Storer) GetCommitInfo(commitID githash.Hash) (gitstore.CommitInfo, erro
 	if err != nil {
 		return gitstore.CommitInfo{}, err
 	}
-	for _, boundary := range shallow {
-		if boundary == commit.Hash {
-			return info, nil
-		}
+	if slices.Contains(shallow, commit.Hash) {
+		return info, nil
 	}
 
 	for _, parentHash := range commit.ParentHashes {
