@@ -6,21 +6,29 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 	t.Run("custom metadata value containing '='", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
+
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)
 
@@ -61,11 +69,73 @@ func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 		assert.Nil(t, m.errorDialog)
 		assert.Equal(t, "Principal added successfully!", m.footer)
 	})
+
+	t.Run("with create-rsl-entry creates RSL entry", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
+
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
+
+		initialRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		m := &model{
+			ctx: t.Context(),
+			options: &options{
+				p: &persistent.Options{
+					SigningKey:   keyPath,
+					WithRSLEntry: true,
+				},
+				policyName: policy.TargetsRoleName,
+			},
+			policyPrincipalsScreen: policyPrincipalsScreen{
+				list: newMenuList("Policy Principals", []list.Item{}, newDelegate(4)),
+			},
+		}
+
+		f := &m.policyPrincipalsFormScreen
+		f.initInputs("Add Person")
+		f.inputs[0].SetValue("jane.doe@example.com")
+		f.inputs[1].SetValue(keyPath + ".pub")
+		f.focusIndex = len(f.inputs) - 1
+
+		f.handleFormSubmit(m)
+
+		assert.Empty(t, m.errorMsg)
+		assert.Nil(t, m.errorDialog)
+		assert.Equal(t, "Principal added successfully!", m.footer)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		refEntry, isRefEntry := latestEntry.(*rsl.ReferenceEntry)
+		require.True(t, isRefEntry)
+		assert.Equal(t, policy.PolicyStagingRef, refEntry.RefName)
+		assert.NotEqual(t, initialRSL.GetID(), latestEntry.GetID())
+	})
 }
 
 func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 	setup := func(t *testing.T) (*model, *gittuf.Repository, string, string) {
 		t.Helper()
+
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
 
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)

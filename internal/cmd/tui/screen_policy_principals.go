@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 )
@@ -495,7 +496,11 @@ func repoAddKeys(ctx context.Context, o *options, keys []tuf.Principal) error {
 	if err != nil {
 		return err
 	}
-	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, keys, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p != nil && o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, keys, true, opts...)
 }
 
 func repoAddPrincipal(ctx context.Context, o *options, person *tufv02.Person) error {
@@ -507,7 +512,11 @@ func repoAddPrincipal(ctx context.Context, o *options, person *tufv02.Person) er
 	if err != nil {
 		return err
 	}
-	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{person}, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p != nil && o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.AddPrincipalToTargets(ctx, signer, o.policyName, []tuf.Principal{person}, true, opts...)
 }
 
 func repoUpdatePrincipal(ctx context.Context, o *options, person *tufv02.Person) error {
@@ -519,7 +528,11 @@ func repoUpdatePrincipal(ctx context.Context, o *options, person *tufv02.Person)
 	if err != nil {
 		return err
 	}
-	return repo.UpdatePrincipalInTargets(ctx, signer, o.policyName, person, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p != nil && o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.UpdatePrincipalInTargets(ctx, signer, o.policyName, person, true, opts...)
 }
 
 func repoRemovePrincipal(ctx context.Context, o *options, personID string) error {
@@ -531,5 +544,9 @@ func repoRemovePrincipal(ctx context.Context, o *options, personID string) error
 	if err != nil {
 		return err
 	}
-	return repo.RemovePrincipalFromTargets(ctx, signer, o.policyName, personID, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p != nil && o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+	return repo.RemovePrincipalFromTargets(ctx, signer, o.policyName, personID, true, opts...)
 }
