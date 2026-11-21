@@ -74,8 +74,9 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, targetID string) (*it
 // provided information. The authorization is embedded in an in-toto "statement"
 // and returned with the appropriate "predicate type" set. The `fromID` and
 // `targetID` specify the change to `targetRef` that is to be authorized by
-// invoking this function. The targetID is expected to be the ID of the commit
-// the tag will point to.
+// invoking this function. The targetID is expected to be the ID of the object
+// the tag will point to once chained tags are peeled. That object may be a
+// commit, a tree, or a blob.
 func NewReferenceAuthorizationForTag(targetRef, fromID, targetID string) (*ita.Statement, error) {
 	predicateStruct, err := newReferenceAuthorizationStruct(targetRef, fromID, targetID)
 	if err != nil {
