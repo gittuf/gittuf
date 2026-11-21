@@ -168,7 +168,7 @@ func TestUpdateDelegation(t *testing.T) {
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 	targetsKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
 
-	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey, targetsKey}, false); err != nil {
+	if err := r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{targetsKey}, false); err != nil {
 		t.Fatal(err)
 	}
 
@@ -355,7 +355,7 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	}
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-	authorizedKeysBytes := []tuf.Principal{targetsPubKey, gpgKey}
+	authorizedKeysBytes := []tuf.Principal{targetsPubKey}
 
 	state, err := policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
 	if err != nil {
@@ -381,6 +381,46 @@ func TestAddPrincipalToTargets(t *testing.T) {
 	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
 	assert.Nil(t, err)
 	assert.Equal(t, 2, len(targetsMetadata.GetPrincipals()))
+
+	// Existing principals are not replaced
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{gpgKey}, false)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
+
+	person := &tufv02.Person{
+		PersonID:             "jane.doe",
+		PublicKeys:           map[string]*tufv02.Key{gpgKey.KeyID: gpgKey},
+		AssociatedIdentities: map[string]string{},
+		Custom:               map[string]string{},
+	}
+
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{person}, false)
+	require.NoError(t, err)
+
+	err = r.StagePolicy(testCtx, "", true, false)
+	require.NoError(t, err)
+
+	replacement := &tufv02.Person{
+		PersonID:             person.PersonID,
+		PublicKeys:           map[string]*tufv02.Key{targetsPubKey.KeyID: targetsPubKey},
+		AssociatedIdentities: map[string]string{},
+		Custom:               map[string]string{},
+	}
+
+	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, []tuf.Principal{replacement}, false)
+	assert.ErrorIs(t, err, tuf.ErrPrincipalAlreadyExists)
+
+	state, err = policy.LoadCurrentState(testCtx, r.r, policy.PolicyStagingRef)
+	require.NoError(t, err)
+
+	targetsMetadata, err = state.GetTargetsMetadata(policy.TargetsRoleName, false)
+	require.NoError(t, err)
+
+	principal, has := targetsMetadata.GetPrincipals()[person.PersonID]
+	require.True(t, has)
+
+	keys := principal.Keys()
+	require.Len(t, keys, 1)
+	assert.Equal(t, gpgKey.KeyID, keys[0].KeyID)
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
@@ -481,7 +521,7 @@ func TestRemovePrincipalFromTargets(t *testing.T) {
 	}
 	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
 
-	authorizedKeysBytes := []tuf.Principal{targetsPubKey, gpgKey}
+	authorizedKeysBytes := []tuf.Principal{targetsPubKey}
 
 	err = r.AddPrincipalToTargets(testCtx, targetsSigner, policy.TargetsRoleName, authorizedKeysBytes, false)
 	assert.Nil(t, err)

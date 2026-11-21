@@ -46,6 +46,7 @@ var (
 	ErrInvalidPrincipalType                            = errors.New("invalid principal type (do you have the right gittuf version?)")
 	ErrInvalidCustomMetadataKey                        = errors.New("custom metadata key contains invalid characters")
 	ErrPrincipalNotFound                               = errors.New("principal not found")
+	ErrPrincipalAlreadyExists                          = errors.New("principal already exists")
 	ErrPrincipalStillInUse                             = errors.New("principal is still in use")
 	ErrRuleNotFound                                    = errors.New("cannot find rule entry")
 	ErrMissingRules                                    = errors.New("some rules are missing")

@@ -835,9 +835,6 @@ func createTestStateWithThresholdPolicy(t *testing.T) *State {
 		t.Fatal(err)
 	}
 
-	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
-		t.Fatal(err)
-	}
 	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
 		t.Fatal(err)
 	}
@@ -1086,9 +1083,6 @@ func createTestStateWithTagPolicy(t *testing.T) *State {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
-		t.Fatal(err)
-	}
 	if err := targetsMetadata.AddRule("protect-tags", []string{gpgKey.KeyID}, []string{"git:refs/tags/*"}, 1); err != nil {
 		t.Fatal(err)
 	}
@@ -1126,9 +1120,6 @@ func createTestStateWithThresholdTagPolicy(t *testing.T) *State {
 
 	targetsMetadata, err := state.GetTargetsMetadata(TargetsRoleName, false)
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := targetsMetadata.AddPrincipal(gpgKey); err != nil {
 		t.Fatal(err)
 	}
 	if err := targetsMetadata.AddPrincipal(approverKey); err != nil {
