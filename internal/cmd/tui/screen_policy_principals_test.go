@@ -6,21 +6,30 @@ package tui
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/charmbracelet/bubbles/list"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/gittuf/gittuf/pkg/rsl"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 	t.Run("custom metadata value containing '='", func(t *testing.T) {
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
+
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)
 
@@ -66,6 +75,10 @@ func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 	setup := func(t *testing.T) (*model, *gittuf.Repository, string, string) {
 		t.Helper()
+
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
 
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)
@@ -183,5 +196,171 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 
 		keyIDs := submitEdit(t, m, repo, person, key.KeyID+", "+otherKeyPath)
 		assert.ElementsMatch(t, []string{key.KeyID, otherKey.KeyID}, keyIDs)
+	})
+}
+
+func TestPolicyPrincipalsHelpersWithRSLEntry(t *testing.T) {
+	setup := func(t *testing.T, withRSL bool) (*options, *gittuf.Repository, string) {
+		t.Helper()
+
+		if runtime.GOOS == "windows" {
+			t.Skip("skipping ssh-keygen signing on windows")
+		}
+
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		otherKeyPath := filepath.Join(tmpDir, "other-key.pub")
+		require.NoError(t, os.WriteFile(otherKeyPath, artifacts.SSHRSAPublicSSH, 0o600))
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		require.NoError(t, repo.InitializeRoot(t.Context(), signer, false, rootopts.WithRSLEntry()))
+
+		key, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
+		require.NoError(t, err)
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, key, false, trustpolicyopts.WithRSLEntry()))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false, trustpolicyopts.WithRSLEntry()))
+
+		opts := &options{
+			p: &persistent.Options{
+				SigningKey:   keyPath,
+				WithRSLEntry: withRSL,
+			},
+			policyName: policy.TargetsRoleName,
+		}
+
+		return opts, repo, otherKeyPath
+	}
+
+	loadKey := func(t *testing.T, repo *gittuf.Repository, path string) *tufv02.Key {
+		t.Helper()
+
+		key, err := gittuf.LoadPublicKey(repo, path)
+		require.NoError(t, err)
+		return key.(*tufv02.Key)
+	}
+
+	newPerson := func(keys ...*tufv02.Key) *tufv02.Person {
+		publicKeys := map[string]*tufv02.Key{}
+		for _, key := range keys {
+			publicKeys[key.KeyID] = key
+		}
+		return &tufv02.Person{
+			PersonID:             "jane.doe@example.com",
+			PublicKeys:           publicKeys,
+			AssociatedIdentities: map[string]string{"github": "janedoe"},
+		}
+	}
+
+	t.Run("repoAddKeys with create-rsl-entry creates RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, true)
+		key := loadKey(t, repo, otherKeyPath)
+
+		initialRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		err = repoAddKeys(t.Context(), opts, []tuf.Principal{key})
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		refEntry, isRefEntry := latestEntry.(*rsl.ReferenceEntry)
+		require.True(t, isRefEntry)
+		assert.Equal(t, policy.PolicyStagingRef, refEntry.RefName)
+		assert.NotEqual(t, initialRSL.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("repoAddKeys without create-rsl-entry does not create RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, false)
+		key := loadKey(t, repo, otherKeyPath)
+
+		initialRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		err = repoAddKeys(t.Context(), opts, []tuf.Principal{key})
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		assert.Equal(t, initialRSL.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("repoAddPrincipal with create-rsl-entry creates RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, true)
+		key := loadKey(t, repo, otherKeyPath)
+		person := newPerson(key)
+
+		initialRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		err = repoAddPrincipal(t.Context(), opts, person)
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		refEntry, isRefEntry := latestEntry.(*rsl.ReferenceEntry)
+		require.True(t, isRefEntry)
+		assert.Equal(t, policy.PolicyStagingRef, refEntry.RefName)
+		assert.NotEqual(t, initialRSL.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("repoAddPrincipal without create-rsl-entry does not create RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, false)
+		key := loadKey(t, repo, otherKeyPath)
+		person := newPerson(key)
+
+		initialRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		err = repoAddPrincipal(t.Context(), opts, person)
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		assert.Equal(t, initialRSL.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("repoUpdatePrincipal with create-rsl-entry creates RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, true)
+		key := loadKey(t, repo, otherKeyPath)
+		person := newPerson(key)
+		require.NoError(t, repoAddPrincipal(t.Context(), opts, person))
+
+		afterAddRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		person.Custom = map[string]string{"location": "berlin"}
+		err = repoUpdatePrincipal(t.Context(), opts, person)
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		assert.NotEqual(t, afterAddRSL.GetID(), latestEntry.GetID())
+	})
+
+	t.Run("repoRemovePrincipal with create-rsl-entry creates RSL entry", func(t *testing.T) {
+		opts, repo, otherKeyPath := setup(t, true)
+		key := loadKey(t, repo, otherKeyPath)
+		person := newPerson(key)
+		require.NoError(t, repoAddPrincipal(t.Context(), opts, person))
+
+		afterAddRSL, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+
+		err = repoRemovePrincipal(t.Context(), opts, person.PersonID)
+		require.NoError(t, err)
+
+		latestEntry, err := rsl.GetLatestEntry(repo.GetStorer())
+		require.NoError(t, err)
+		assert.NotEqual(t, afterAddRSL.GetID(), latestEntry.GetID())
 	})
 }

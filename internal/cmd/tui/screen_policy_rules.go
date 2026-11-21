@@ -14,6 +14,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 )
 
 type rule struct {
@@ -326,7 +327,12 @@ func repoAddRule(ctx context.Context, o *options, rule rule, authorizedPrincipal
 		return err
 	}
 
-	return repo.AddDelegation(ctx, signer, o.policyName, rule.name, authorizedPrincipalIDs, protectedNamespaces, rule.threshold, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.AddDelegation(ctx, signer, o.policyName, rule.name, authorizedPrincipalIDs, protectedNamespaces, rule.threshold, true, opts...)
 }
 
 // repoUpdateRule updates an existing rule in the policy file.
@@ -341,7 +347,12 @@ func repoUpdateRule(ctx context.Context, o *options, r rule, authorizedPrincipal
 		return err
 	}
 
-	return repo.UpdateDelegation(ctx, signer, o.policyName, r.name, authorizedPrincipalIDs, protectedNamespaces, r.threshold, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.UpdateDelegation(ctx, signer, o.policyName, r.name, authorizedPrincipalIDs, protectedNamespaces, r.threshold, true, opts...)
 }
 
 // repoRemoveRule removes a rule from the policy file.
@@ -355,7 +366,13 @@ func repoRemoveRule(ctx context.Context, o *options, rule rule) error {
 	if err != nil {
 		return err
 	}
-	return repo.RemoveDelegation(ctx, signer, o.policyName, rule.name, true)
+
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.RemoveDelegation(ctx, signer, o.policyName, rule.name, true, opts...)
 }
 
 // repoReorderRules reorders the rules in the policy file.
@@ -375,5 +392,10 @@ func repoReorderRules(ctx context.Context, o *options, rules []rule) error {
 		ruleNames[i] = r.name
 	}
 
-	return repo.ReorderDelegations(ctx, signer, o.policyName, ruleNames, true)
+	opts := []trustpolicyopts.Option{}
+	if o.p.WithRSLEntry {
+		opts = append(opts, trustpolicyopts.WithRSLEntry())
+	}
+
+	return repo.ReorderDelegations(ctx, signer, o.policyName, ruleNames, true, opts...)
 }
