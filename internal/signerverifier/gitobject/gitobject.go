@@ -203,11 +203,6 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 		}
 	}
 
-	verifiedCert, err := verifier.Verify(ctx, data, signature, true)
-	if err != nil {
-		return ErrIncorrectVerificationKey
-	}
-
 	slog.Debug("Using Rekor instance", "rekorURL", rekorURL)
 
 	// gitsignRekor.NewWithOptions invokes cosign.GetRekorPubs which looks at
@@ -215,6 +210,11 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 	rekor, err := gitsignRekor.NewWithOptions(ctx, rekorURL)
 	if err != nil {
 		return errors.Join(ErrVerifyingSigstoreSignature, err)
+	}
+
+	summary, err := gitsignVerifier.Verify(ctx, verifier, rekor, data, signature, true)
+	if err != nil {
+		return ErrIncorrectVerificationKey
 	}
 
 	checkOpts.RekorClient = rekor.Rekor
@@ -229,7 +229,7 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 
 	checkOpts.CTLogPubKeys = ctPub
 
-	if _, err := cosign.ValidateAndUnpackCert(verifiedCert, checkOpts); err != nil {
+	if _, err := cosign.ValidateAndUnpackCert(summary.Cert, checkOpts); err != nil {
 		return errors.Join(ErrIncorrectVerificationKey, err)
 	}
 
