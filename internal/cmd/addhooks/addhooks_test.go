@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -74,5 +75,36 @@ func TestAddHooks(t *testing.T) {
 		content, err := os.ReadFile(dummyHookPath)
 		assert.NoError(t, err)
 		assert.Equal(t, prePushScript, content)
+	})
+
+	t.Run("custom core.hooksPath", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		require.NoError(t, repo.SetGitConfig("core.hooksPath", ".custom-hooks"))
+
+		_, _, _, err := cmd.ExecuteCommandC(New())
+		assert.NoError(t, err)
+
+		hookPath := filepath.Join(".custom-hooks", "pre-push")
+		content, err := os.ReadFile(hookPath)
+		assert.NoError(t, err)
+		assert.Equal(t, prePushScript, content)
+
+		// Verify standard .git/hooks directory was not used
+		_, err = os.Stat(filepath.Join(".git", "hooks", "pre-push"))
+		assert.ErrorIs(t, err, os.ErrNotExist)
+	})
+
+	t.Run("core.hooksPath set to /dev/null", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		require.NoError(t, repo.SetGitConfig("core.hooksPath", "/dev/null"))
+
+		_, _, _, err := cmd.ExecuteCommandC(New())
+		assert.ErrorIs(t, err, gittuf.ErrHooksDisabled)
 	})
 }
