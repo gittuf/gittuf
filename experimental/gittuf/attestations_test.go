@@ -6,7 +6,6 @@ package gittuf
 import (
 	"fmt"
 	"net/url"
-	"os"
 	"strings"
 	"testing"
 
@@ -107,14 +106,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(testDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(testDir)
 
 		repo := &Repository{r: newStorer(r)}
 
@@ -228,14 +220,7 @@ func TestAddAndRemoveReferenceAuthorization(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(testDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(testDir)
 
 		repo := &Repository{r: newStorer(r)}
 
@@ -426,14 +411,7 @@ func TestAddReferenceAuthorizationForNewTagZeroHashFormat(t *testing.T) {
 
 			// We need to change the directory because we `checkout` for older
 			// Git versions, modifying the worktree.
-			pwd, err := os.Getwd()
-			if err != nil {
-				t.Fatal(err)
-			}
-			if err := os.Chdir(testDir); err != nil {
-				t.Fatal(err)
-			}
-			defer os.Chdir(pwd) //nolint:errcheck
+			t.Chdir(testDir)
 
 			repo := &Repository{r: newStorer(r)}
 

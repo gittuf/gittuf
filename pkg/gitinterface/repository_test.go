@@ -285,7 +285,7 @@ func TestLoadRepositoryConcurrent(t *testing.T) {
 
 	const iterations = 20
 	var wg sync.WaitGroup
-	for i := 0; i < iterations; i++ {
+	for range iterations {
 		wg.Add(2)
 		go func() {
 			defer wg.Done()
