@@ -617,3 +617,47 @@ func TestIncrementTargetsVersion(t *testing.T) {
 		assert.ErrorIs(t, err, gitinterface.ErrSigningKeyNotSpecified)
 	})
 }
+
+func TestFindReusedKeys(t *testing.T) {
+	targetsSigner := setupSSHKeysForSigning(t, targetsKeyBytes, targetsPubKeyBytes)
+	sshKey := tufv01.NewKeyFromSSLibKey(targetsSigner.MetadataKey())
+
+	gpgKeyR, err := gpg.LoadGPGKeyFromBytes(gpgPubKeyBytes)
+	require.NoError(t, err)
+	gpgKey := tufv01.NewKeyFromSSLibKey(gpgKeyR)
+
+	person := &tufv02.Person{
+		PersonID:   "jane.doe",
+		PublicKeys: map[string]*tufv02.Key{sshKey.KeyID: sshKey, gpgKey.KeyID: gpgKey},
+	}
+
+	t.Run("keys already held by a person", func(t *testing.T) {
+		existingPrincipals := map[string]tuf.Principal{person.ID(): person}
+
+		for _, key := range []*tufv02.Key{sshKey, gpgKey} {
+			reusedKeys := findReusedKeys(existingPrincipals, key)
+			assert.Equal(t, map[string][]string{key.KeyID: {person.ID()}}, reusedKeys)
+
+			existingPrincipals[key.ID()] = key
+		}
+	})
+
+	t.Run("person holds keys that are already key principals", func(t *testing.T) {
+		existingPrincipals := map[string]tuf.Principal{sshKey.ID(): sshKey, gpgKey.ID(): gpgKey}
+
+		reusedKeys := findReusedKeys(existingPrincipals, person)
+		assert.Equal(t, map[string][]string{sshKey.KeyID: {sshKey.ID()}, gpgKey.KeyID: {gpgKey.ID()}}, reusedKeys)
+	})
+
+	t.Run("same principal is not reported", func(t *testing.T) {
+		existingPrincipals := map[string]tuf.Principal{person.ID(): person}
+
+		assert.Empty(t, findReusedKeys(existingPrincipals, person))
+	})
+
+	t.Run("no shared keys", func(t *testing.T) {
+		existingPrincipals := map[string]tuf.Principal{gpgKey.ID(): gpgKey}
+
+		assert.Empty(t, findReusedKeys(existingPrincipals, sshKey))
+	})
+}

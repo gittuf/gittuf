@@ -34,12 +34,14 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	err = repo.UpdateGitHook(gittuf.HookPrePush, prePushScript, o.force)
 	var hookErr *gittuf.ErrHookExists
 	if errors.As(err, &hookErr) {
-		fmt.Fprintf(
+		if _, writeErr := fmt.Fprintf(
 			cmd.ErrOrStderr(),
 			"'%s' already exists. Use --force flag or merge existing hook and the following script manually:\n\n%s\n",
 			string(hookErr.HookType),
 			prePushScript,
-		)
+		); writeErr != nil {
+			return errors.Join(err, writeErr)
+		}
 	}
 	return err
 }

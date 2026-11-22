@@ -10,6 +10,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -98,9 +99,12 @@ func (s *Signer) Sign(_ context.Context, data []byte) ([]byte, error) {
 // https://git-scm.com/docs/git-config#Documentation/git-config.txt-usersigningKey
 func NewKeyFromFile(path string) (*signerverifier.SSLibKey, error) {
 	cmd := exec.Command("ssh-keygen", "-m", "rfc4716", "-e", "-f", path)
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+			return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, exitErr.Stderr)
+		}
+		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
 	}
 	sshPub, err := parseSSH2Key(string(output))
 	if err != nil {

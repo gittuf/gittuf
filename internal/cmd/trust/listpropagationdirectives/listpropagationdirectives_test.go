@@ -13,6 +13,7 @@ import (
 	rootopts "github.com/gittuf/gittuf/experimental/gittuf/options/root"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd"
+	"github.com/gittuf/gittuf/internal/dev"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
@@ -67,6 +68,8 @@ func TestListPropagationDirectives(t *testing.T) {
 	})
 
 	t.Run("success with directives", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "1") // Since we need to add directives
+
 		tmpDir := t.TempDir()
 		gitinterface.CreateTestGitRepository(t, tmpDir, false)
 

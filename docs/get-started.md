@@ -107,7 +107,7 @@ gittuf policy apply --local-only
 You can make changes in the repository using standard Git workflows. However,
 changes to Git references (i.e., branches and tags) must be recorded in gittuf's
 reference state log (RSL). Currently, this must be executed manually or using a
-pre-push hook (see `gittuf add-hook -h` for more information about adding the
+pre-push hook (see `gittuf add-hooks -h` for more information about adding the
 hook and [#220] for planned gittuf and Git command compatibility).
 
 ```bash

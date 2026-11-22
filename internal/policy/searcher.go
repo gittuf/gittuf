@@ -5,7 +5,6 @@ package policy
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 
 	"github.com/gittuf/gittuf/internal/attestations"
@@ -66,14 +65,14 @@ func (r *regularSearcher) FindLatestPolicyEntry() (rsl.ReferenceUpdaterEntry, er
 func (r *regularSearcher) FindPolicyEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	// If the requested entry itself is for the policy ref, return as is
 	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == PolicyRef {
-		slog.Debug(fmt.Sprintf("Initial entry '%s' is for gittuf policy, setting that as current policy...", entry.GetID().String()))
+		slog.Debug("Initial RSL entry is for gittuf policy, setting that as current policy", "entryID", entry.GetID().String())
 		return entry, nil
 	}
 
 	policyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(r.storer, rsl.ForReference(PolicyRef), rsl.BeforeEntryID(entry.GetID()))
 	if err != nil {
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
-			slog.Debug(fmt.Sprintf("No policy found before initial entry '%s'", entry.GetID().String()))
+			slog.Debug("No policy found before initial entry", "entryID", entry.GetID().String())
 			return nil, ErrPolicyNotFound
 		}
 
@@ -100,7 +99,7 @@ func (r *regularSearcher) FindPolicyEntriesInRange(firstEntry, lastEntry rsl.Ent
 func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (rsl.ReferenceUpdaterEntry, error) {
 	// If the requested entry itself is for the attestations ref, return as is
 	if entry, isReferenceUpdaterEntry := entry.(rsl.ReferenceUpdaterEntry); isReferenceUpdaterEntry && entry.GetRefName() == attestations.Ref {
-		slog.Debug(fmt.Sprintf("Initial entry '%s' is for attestations, setting that as current set of attestations...", entry.GetID().String()))
+		slog.Debug("Initial entry is for attestations, setting that as current set of attestations", "entryID", entry.GetID().String())
 		return entry, nil
 	}
 
@@ -109,7 +108,7 @@ func (r *regularSearcher) FindAttestationsEntryFor(entry rsl.Entry) (rsl.Referen
 		if errors.Is(err, rsl.ErrRSLEntryNotFound) {
 			// Attestations may not be used yet, they're not
 			// compulsory
-			slog.Debug(fmt.Sprintf("No attestations found before initial entry '%s'", entry.GetID().String()))
+			slog.Debug("No attestations found before initial entry", "entryID", entry.GetID().String())
 			return nil, attestations.ErrAttestationsNotFound
 		}
 

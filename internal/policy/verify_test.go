@@ -174,11 +174,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		currentRSLTipParentIDs, err := repo.GetCommitParentIDs(currentRSLTip)
+		currentRSLTipInfo, err := repo.GetCommitInfo(currentRSLTip)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.SetReference(rsl.Ref, currentRSLTipParentIDs[0]); err != nil {
+		if err := repo.SetReference(rsl.Ref, currentRSLTipInfo.ParentIDs[0]); err != nil {
 			// Set to parent -> this is policy staging
 			t.Fatal(err)
 		}
@@ -326,10 +326,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgKeyBytes)
 		if err != nil {
@@ -381,10 +382,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgUnauthorizedKeyBytes)
 		if err != nil {
@@ -694,10 +696,11 @@ func TestVerifyRelativeForRefUsingPersons(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgKeyBytes)
 		if err != nil {
@@ -790,10 +793,11 @@ func TestVerifyMergeable(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Set up approval attestation with "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -852,10 +856,11 @@ func TestVerifyMergeable(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -937,10 +942,11 @@ func TestVerifyMergeable(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "jane.doe" and "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
@@ -999,10 +1005,11 @@ func TestVerifyMergeable(t *testing.T) {
 		entryID := common.CreateTestRSLReferenceEntryCommit(t, repo, entry, gpgKeyBytes)
 		entry.ID = entryID
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted identities
@@ -1077,10 +1084,11 @@ func TestVerifyMergeable(t *testing.T) {
 		featureEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, featureEntry, gpgKeyBytes)
 		featureEntry.ID = featureEntryID
 
-		commitTreeID, err := repo.GetCommitTreeID(featureCommitIDs[1]) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureCommitIDs[1]) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Set up approval attestation with "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -1154,10 +1162,11 @@ func TestVerifyMergeable(t *testing.T) {
 		featureEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, featureEntry, gpgKeyBytes)
 		featureEntry.ID = featureEntryID
 
-		commitTreeID, err := repo.GetCommitTreeID(featureCommitIDs[1]) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureCommitIDs[1]) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -1254,10 +1263,11 @@ func TestVerifyMergeable(t *testing.T) {
 		featureEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, featureEntry, gpgKeyBytes)
 		featureEntry.ID = featureEntryID
 
-		commitTreeID, err := repo.GetCommitTreeID(featureCommitIDs[1]) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureCommitIDs[1]) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "jane.doe" and "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe", "jane.doe"}, nil)
@@ -1331,10 +1341,11 @@ func TestVerifyMergeable(t *testing.T) {
 		featureEntryID := common.CreateTestRSLReferenceEntryCommit(t, repo, featureEntry, gpgKeyBytes)
 		featureEntry.ID = featureEntryID
 
-		commitTreeID, err := repo.GetCommitTreeID(featureCommitIDs[1]) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureCommitIDs[1]) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted approvals
@@ -1427,10 +1438,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		commitInfo, err := repo.GetCommitInfo(featureID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Set up approval attestation with "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -1487,10 +1499,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		commitInfo, err := repo.GetCommitInfo(featureID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -1570,10 +1583,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		commitInfo, err := repo.GetCommitInfo(featureID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "jane.doe" and "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jane.doe", "john.doe"}, nil)
@@ -1630,10 +1644,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID)
+		commitInfo, err := repo.GetCommitInfo(featureID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted identities
@@ -1706,10 +1721,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
 		featureID := featureCommitIDs[1]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureID) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Set up approval attestation with "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -1781,10 +1797,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
 		featureID := featureCommitIDs[1]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureID) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		currentAttestations, err := attestations.LoadCurrentAttestations(repo)
 		if err != nil {
@@ -1879,10 +1896,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
 		featureID := featureCommitIDs[1]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureID) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "jane.doe" and "john.doe"
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, baseCommitIDs[1].String(), commitTreeID.String(), []string{"john.doe", "jane.doe"}, nil)
@@ -1954,10 +1972,11 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		featureCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 2, gpgKeyBytes)
 		featureID := featureCommitIDs[1]
 
-		commitTreeID, err := repo.GetCommitTreeID(featureID) // latest commit
+		commitInfo, err := repo.GetCommitInfo(featureID) // latest commit
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Add approval with "alice" and "bob"
 		// These are untrusted approvals
@@ -2181,6 +2200,115 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 	})
 
+	t.Run("controller policy update", func(t *testing.T) {
+		controllerRepository, networkRepository := createControllerAndNetworkRepositories(t)
+		refName := "refs/heads/controller-update"
+
+		networkState, err := LoadCurrentState(testCtx, networkRepository, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkRootMetadata, err := networkState.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		signer := setupSSHKeysForSigning(t, rootKeyBytes, rootPubKeyBytes)
+		networkKey := tufv01.NewKeyFromSSLibKey(signer.MetadataKey())
+		if err := networkRootMetadata.AddPrimaryRuleFilePrincipal(networkKey); err != nil {
+			t.Fatal(err)
+		}
+		networkRootEnvelope, err := dsse.CreateEnvelope(networkRootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkRootEnvelope, err = dsse.SignEnvelope(testCtx, networkRootEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsMetadata := InitializeTargetsMetadata()
+		if err := networkTargetsMetadata.AddPrincipal(networkKey); err != nil {
+			t.Fatal(err)
+		}
+		if err := networkTargetsMetadata.AddRule("allow-controller-update", []string{networkKey.KeyID}, []string{"git:" + refName}, 1); err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsEnvelope, err := dsse.CreateEnvelope(networkTargetsMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkTargetsEnvelope, err = dsse.SignEnvelope(testCtx, networkTargetsEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		networkState.Metadata.RootEnvelope = networkRootEnvelope
+		networkState.Metadata.TargetsEnvelope = networkTargetsEnvelope
+		if err := networkState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+		if err := networkState.Commit(networkRepository, "Add local policy\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := Apply(testCtx, networkRepository, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, rootKeyBytes)
+		firstEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		firstEntryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, firstEntry, rootKeyBytes)
+		firstEntry.ID = firstEntryID
+		verifier := NewPolicyVerifier(networkRepository)
+		if err := verifier.VerifyRelativeForRef(testCtx, firstEntry, firstEntry, refName); err != nil {
+			t.Fatal(err)
+		}
+
+		controllerState, err := LoadCurrentState(testCtx, controllerRepository, PolicyRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerRootMetadata, err := controllerState.GetRootMetadata(false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := controllerRootMetadata.AddGlobalRule(tufv01.NewGlobalRuleThreshold("controller-update", []string{"git:" + refName}, 2)); err != nil {
+			t.Fatal(err)
+		}
+
+		controllerRootEnvelope, err := dsse.CreateEnvelope(controllerRootMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerRootEnvelope, err = dsse.SignEnvelope(testCtx, controllerRootEnvelope, signer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		controllerState.Metadata.RootEnvelope = controllerRootEnvelope
+		if err := controllerState.preprocess(); err != nil {
+			t.Fatal(err)
+		}
+		if err := controllerState.Commit(controllerRepository, "Add global rule\n", true, false); err != nil {
+			t.Fatal(err)
+		}
+		if err := Apply(testCtx, controllerRepository, false); err != nil {
+			t.Fatal(err)
+		}
+
+		if err := propagation.PropagateChangesFromUpstreamRepository(networkRepository, controllerRepository, getPropagationDirectivesForNetworkRepository(t, networkRootMetadata), false); err != nil {
+			t.Fatal(err)
+		}
+
+		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, rootKeyBytes)
+		lastEntry := rsl.NewReferenceEntry(refName, commitIDs[0])
+		lastEntryID := common.CreateTestRSLReferenceEntryCommit(t, networkRepository, lastEntry, rootKeyBytes)
+		lastEntry.ID = lastEntryID
+
+		verifier = NewPolicyVerifier(networkRepository)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, lastEntry, refName)
+		assert.ErrorIs(t, err, ErrVerificationFailed)
+	})
+
 	t.Run("no recovery, first entry is the very first entry", func(t *testing.T) {
 		repo, _ := createTestRepository(t, createTestStateWithPolicy)
 		refName := "refs/heads/main"
@@ -2209,11 +2337,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		currentRSLTipParentIDs, err := repo.GetCommitParentIDs(currentRSLTip)
+		currentRSLTipInfo, err := repo.GetCommitInfo(currentRSLTip)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := repo.SetReference(rsl.Ref, currentRSLTipParentIDs[0]); err != nil {
+		if err := repo.SetReference(rsl.Ref, currentRSLTipInfo.ParentIDs[0]); err != nil {
 			// Set to parent -> this is policy staging
 			t.Fatal(err)
 		}
@@ -2233,6 +2361,77 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		verifier := NewPolicyVerifier(repo)
 		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, entry, refName)
 		assert.ErrorIs(t, err, ErrPolicyNotFound)
+	})
+
+	t.Run("invalidly signed metadata in policy transition", func(t *testing.T) {
+		repo, _ := createTestRepository(t, createTestStateWithPolicy)
+		refName := "refs/heads/main"
+
+		firstPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		state.repository = repo
+		if err := state.Commit(repo, "Invalid policy", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		lastPolicyEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstPolicyEntry, lastPolicyEntry, refName)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
+	})
+
+	t.Run("invalidly signed metadata in first policy", func(t *testing.T) {
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		refName := "refs/heads/main"
+
+		state := createTestStateWithPolicyTargetsSignedByWrongKey(t)
+		state.repository = repo
+		if err := state.Commit(repo, "Invalid policy", true, false); err != nil {
+			t.Fatal(err)
+		}
+
+		firstEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyStagingRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+		policyStagingTip, err := repo.GetReference(PolicyStagingRef)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := repo.SetReference(PolicyRef, policyStagingTip); err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewReferenceEntry(PolicyRef, policyStagingTip).Commit(repo, false); err != nil {
+			t.Fatal(err)
+		}
+
+		lastEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(repo, rsl.ForReference(PolicyRef))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		verifier := NewPolicyVerifier(repo)
+		err = verifier.VerifyRelativeForRef(testCtx, firstEntry, lastEntry, refName)
+		assert.ErrorIs(t, err, ErrVerifierConditionsUnmet)
 	})
 
 	t.Run("with recovery, commit-same, recovered by authorized user", func(t *testing.T) {
@@ -2361,10 +2560,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgKeyBytes)
 		if err != nil {
@@ -2416,10 +2616,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgUnauthorizedKeyBytes)
 		if err != nil {
@@ -2729,10 +2930,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		assert.ErrorIs(t, err, ErrVerificationFailed)
 
 		// Fix using the known-good commit's tree
-		validTreeID, err := repo.GetCommitTreeID(validCommitID)
+		validCommitInfo, err := repo.GetCommitInfo(validCommitID)
 		if err != nil {
 			t.Fatal(err)
 		}
+		validTreeID := validCommitInfo.TreeID
 
 		newCommitID, err := repo.CommitUsingSpecificKey(validTreeID, refName, "Revert invalid commit\n", gpgKeyBytes)
 		if err != nil {
@@ -2812,10 +3014,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		authorization, err := authorizationsv02.NewReferenceAuthorizationForCommit(refName, gitinterface.ZeroHash.String(), commitTreeID.String())
 		if err != nil {
@@ -2864,10 +3067,11 @@ func TestVerifyRelativeForRef(t *testing.T) {
 		// Do this again so we have two successive valid changes
 		commitIDs = common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 
-		commitTreeID, err = repo.GetCommitTreeID(commitIDs[1])
+		commitInfo, err = repo.GetCommitInfo(commitIDs[1])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID = commitInfo.TreeID
 
 		authorization, err = authorizationsv02.NewReferenceAuthorizationForCommit(refName, firstValidCommitOnRef.String(), commitTreeID.String())
 		if err != nil {
@@ -2963,10 +3167,11 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change
 		// We're explicitly using the old type here to ensure policy
@@ -3019,10 +3224,11 @@ func TestVerifyEntry(t *testing.T) {
 
 				commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-				commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+				commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 				if err != nil {
 					t.Fatal(err)
 				}
+				commitTreeID := commitInfo.TreeID
 
 				// Create authorization for this change
 				// This uses the latest reference authorization version. The
@@ -3078,10 +3284,11 @@ func TestVerifyEntry(t *testing.T) {
 		// This is using the jane.doe signer
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change using john.doe trusted as approver
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -3133,10 +3340,11 @@ func TestVerifyEntry(t *testing.T) {
 		// This is using the jane.doe signer
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change using john.doe trusted as approver
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -3188,10 +3396,11 @@ func TestVerifyEntry(t *testing.T) {
 		// This is the jane.doe principal
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Approved by jill.doe
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
@@ -3267,10 +3476,11 @@ func TestVerifyEntry(t *testing.T) {
 		// This is the jane.doe principal
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Approved by jill.doe
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
@@ -3345,10 +3555,11 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create approval for jill.doe -> NOT TRUSTED in this policy
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"jill.doe"}, nil)
@@ -3399,10 +3610,11 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create approval for john.doe
 		githubAppApproval, err := attestations.NewGitHubPullRequestApprovalAttestation(refName, gitinterface.ZeroHash.String(), commitTreeID.String(), []string{"john.doe"}, nil)
@@ -3485,10 +3697,11 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
@@ -3538,10 +3751,11 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := repo.GetCommitTreeID(commitIDs[0])
+		commitInfo, err := repo.GetCommitInfo(commitIDs[0])
 		if err != nil {
 			t.Fatal(err)
 		}
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version
@@ -3745,8 +3959,9 @@ func TestVerifyEntry(t *testing.T) {
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, networkRepository, refName, 1, gpgKeyBytes)
 
-		commitTreeID, err := networkRepository.GetCommitTreeID(commitIDs[0])
-		require.Nil(t, err)
+		commitInfo, err := networkRepository.GetCommitInfo(commitIDs[0])
+		require.NoError(t, err)
+		commitTreeID := commitInfo.TreeID
 
 		// Create authorization for this change
 		// This uses the latest reference authorization version

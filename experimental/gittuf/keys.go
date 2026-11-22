@@ -6,7 +6,6 @@ package gittuf
 import (
 	"errors"
 	"fmt"
-	"os/exec"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -40,8 +39,9 @@ var (
 )
 
 // LoadPublicKey returns a signerverifier.SSLibKey object for a PGP / Sigstore
-// Fulcio / SSH (on-disk) key for use in gittuf metadata.
-func LoadPublicKey(keyRef string) (tuf.Principal, error) {
+// Fulcio / SSH (on-disk) key for use in gittuf metadata. GPG keys are loaded
+// using the gpg.program set in the repository's Git config, if any.
+func LoadPublicKey(repo *Repository, keyRef string) (tuf.Principal, error) {
 	var (
 		keyObj *signerverifier.SSLibKey
 		err    error
@@ -51,13 +51,12 @@ func LoadPublicKey(keyRef string) (tuf.Principal, error) {
 	case strings.HasPrefix(keyRef, GPGKeyPrefix):
 		fingerprint := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(keyRef, GPGKeyPrefix)))
 
-		command := exec.Command("gpg", "--export", "--armor", fingerprint)
-		stdOut, err := command.Output()
+		opts, err := getGPGOptions(repo.r)
 		if err != nil {
 			return nil, err
 		}
 
-		keyObj, err = gpg.LoadGPGKeyFromBytes(stdOut)
+		keyObj, err = gpg.LoadPublicKeyFromKeyID(fingerprint, opts...)
 		if err != nil {
 			return nil, err
 		}
@@ -124,11 +123,11 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	case signingMethodGPG:
 		// GPG
 		// Load a GPG signer from the specified key
-		return LoadPublicKey(fmt.Sprintf("%s:%s", "gpg", signingKey))
+		return LoadPublicKey(repo, fmt.Sprintf("%s:%s", "gpg", signingKey))
 	case signingMethodSSH:
 		// SSH
 		// Load an SSH signer from the specified key
-		return LoadPublicKey(signingKey)
+		return LoadPublicKey(repo, signingKey)
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
@@ -138,7 +137,7 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 		}
 		if x509Program == "gitsign" {
 			// gitsign
-			return LoadPublicKey(fmt.Sprintf("%s:%s", "fulcio", signingKey))
+			return LoadPublicKey(repo, fmt.Sprintf("%s:%s", "fulcio", signingKey))
 		}
 		return nil, ErrUnsupportedX509Method
 	default:

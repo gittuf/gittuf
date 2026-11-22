@@ -9,32 +9,32 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 ### Options
 
 ```
-      --create-rsl-entry     create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
-  -h, --help                 help for trust
-  -k, --signing-key string   signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
+      --create-rsl-entry[=true|false]   create RSL entry for policy change immediately (note: the RSL will not be synced with the remote)
+  -h, --help[=true|false]               help for trust
+  -k, --signing-key string              signing key to use to sign root of trust (path to SSH key, "gpg:<fingerprint>" for GPG, "fulcio:" for Sigstore)
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO
 
 * [gittuf](gittuf.md)	 - A security layer for Git repositories, powered by TUF
-* [gittuf trust add-controller-repository](gittuf_trust_add-controller-repository.md)	 - Add a controller repository
+* [gittuf trust add-controller-repository](gittuf_trust_add-controller-repository.md)	 - Add a controller repository (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-github-app](gittuf_trust_add-github-app.md)	 - Add GitHub app to gittuf root of trust
 * [gittuf trust add-global-rule](gittuf_trust_add-global-rule.md)	 - Add a new global rule to root of trust
-* [gittuf trust add-network-repository](gittuf_trust_add-network-repository.md)	 - Add a network repository
+* [gittuf trust add-network-repository](gittuf_trust_add-network-repository.md)	 - Add a network repository (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-policy-key](gittuf_trust_add-policy-key.md)	 - Add Policy key to gittuf root of trust
-* [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust
+* [gittuf trust add-propagation-directive](gittuf_trust_add-propagation-directive.md)	 - Add propagation directive into gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust add-root-key](gittuf_trust_add-root-key.md)	 - Add Root key to gittuf root of trust
 * [gittuf trust apply](gittuf_trust_apply.md)	 - Validate and apply changes from policy-staging to policy
 * [gittuf trust disable-github-app-approvals](gittuf_trust_disable-github-app-approvals.md)	 - Mark GitHub app approvals as untrusted henceforth
@@ -44,12 +44,12 @@ The 'trust' command provides tools to manage gittuf's root of trust, including s
 * [gittuf trust inspect-root](gittuf_trust_inspect-root.md)	 - Inspect root metadata
 * [gittuf trust list-global-rules](gittuf_trust_list-global-rules.md)	 - List global rules for the current state
 * [gittuf trust list-propagation-directives](gittuf_trust_list-propagation-directives.md)	 - Lists propagation directives in the gittuf root of trust
-* [gittuf trust make-controller](gittuf_trust_make-controller.md)	 - Make current repository a controller
+* [gittuf trust make-controller](gittuf_trust_make-controller.md)	 - Make current repository a controller (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remote](gittuf_trust_remote.md)	 - Tools for managing remote policies
 * [gittuf trust remove-github-app](gittuf_trust_remove-github-app.md)	 - Remove GitHub app from gittuf root of trust
 * [gittuf trust remove-global-rule](gittuf_trust_remove-global-rule.md)	 - Remove a global rule from root of trust
 * [gittuf trust remove-policy-key](gittuf_trust_remove-policy-key.md)	 - Remove Policy key from gittuf root of trust
-* [gittuf trust remove-propagation-directive](gittuf_trust_remove-propagation-directive.md)	 - Remove propagation directive from gittuf root of trust
+* [gittuf trust remove-propagation-directive](gittuf_trust_remove-propagation-directive.md)	 - Remove propagation directive from gittuf root of trust (developer mode only, set GITTUF_DEV=1)
 * [gittuf trust remove-root-key](gittuf_trust_remove-root-key.md)	 - Remove Root key from gittuf root of trust
 * [gittuf trust set-repository-location](gittuf_trust_set-repository-location.md)	 - Set repository location
 * [gittuf trust sign](gittuf_trust_sign.md)	 - Sign root of trust

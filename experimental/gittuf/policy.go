@@ -6,12 +6,12 @@ package gittuf
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
 
 	rslopts "github.com/gittuf/gittuf/experimental/gittuf/options/rsl"
 	"github.com/gittuf/gittuf/internal/policy"
+	policyopts "github.com/gittuf/gittuf/internal/policy/options/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/rsl"
 )
@@ -27,7 +27,7 @@ var (
 // Note that this also pushes the RSL as the policy cannot change without an
 // update to the RSL.
 func (r *Repository) PushPolicy(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pushing policy and RSL references to %s...", remoteName))
+	slog.Debug("Pushing policy and RSL references to remote", "remoteName", remoteName)
 	if err := r.r.Push(remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}); err != nil {
 		return errors.Join(ErrPushingPolicy, err)
 	}
@@ -39,7 +39,7 @@ func (r *Repository) PushPolicy(remoteName string) error {
 // marked as fast forward only to detect divergence. Note that this also fetches
 // the RSL as the policy must be updated in sync with the RSL.
 func (r *Repository) PullPolicy(remoteName string) error {
-	slog.Debug(fmt.Sprintf("Pulling policy and RSL references from %s...", remoteName))
+	slog.Debug("Pulling policy and RSL references from remote", "remoteName", remoteName)
 	if err := r.r.Fetch(remoteName, []string{policy.PolicyRef, policy.PolicyStagingRef, rsl.Ref}, true); err != nil {
 		return errors.Join(ErrPullingPolicy, err)
 	}
@@ -111,7 +111,7 @@ func (r *Repository) ListRules(ctx context.Context, targetRef string) ([]*Delega
 		targetRef = "refs/gittuf/" + targetRef
 	}
 
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (r *Repository) ListPrincipals(ctx context.Context, targetRef, policyName s
 		targetRef = "refs/gittuf/" + targetRef
 	}
 
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -204,7 +204,7 @@ func (r *Repository) ListGlobalRules(ctx context.Context, targetRef string) ([]t
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, targetRef)
+	state, err := r.loadStateForInspection(ctx, targetRef)
 	if err != nil {
 		return nil, err
 	}
@@ -232,4 +232,17 @@ func (r *Repository) StagePolicy(ctx context.Context, remoteName string, localOn
 	}
 
 	return r.RecordRSLEntryForReference(ctx, policy.PolicyStagingRef, signCommit, opts...)
+}
+
+// loadStateForInspection loads the policy state at the specified ref for read
+// only operations such as listing rules or principals. Changes to the policy
+// staging ref are by default not recorded with an RSL entry until the user runs
+// `gittuf policy stage`, so it is loaded directly from the ref's tip. Other
+// refs are loaded using their latest RSL entry.
+func (r *Repository) loadStateForInspection(ctx context.Context, targetRef string) (*policy.State, error) {
+	if targetRef == policy.PolicyStagingRef {
+		return policy.LoadCurrentState(ctx, r.r, targetRef, policyopts.BypassRSL())
+	}
+
+	return policy.LoadCurrentState(ctx, r.r, targetRef)
 }

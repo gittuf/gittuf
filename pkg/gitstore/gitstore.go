@@ -59,14 +59,9 @@ type Storer interface {
 	// slash-separated path within the specified tree.
 	GetPathIDInTree(treeID githash.Hash, treePath string) (githash.Hash, error)
 
-	// GetCommitTreeID returns the ID of the specified commit's tree.
-	GetCommitTreeID(commitID githash.Hash) (githash.Hash, error)
-
-	// GetCommitMessage returns the specified commit's message.
-	GetCommitMessage(commitID githash.Hash) (string, error)
-
-	// GetCommitParentIDs returns the IDs of the specified commit's parents.
-	GetCommitParentIDs(commitID githash.Hash) ([]githash.Hash, error)
+	// GetCommitInfo returns the tree ID, parent IDs, and message of the
+	// specified commit. It returns an error if the object is not a commit.
+	GetCommitInfo(commitID githash.Hash) (CommitInfo, error)
 
 	// GetCommitsBetweenRange returns the commits reachable from commitNewID
 	// but not from commitOldID. A zero commitOldID (nil, empty, or the

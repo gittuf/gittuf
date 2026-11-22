@@ -80,6 +80,42 @@ func TestProfiling(t *testing.T) {
 		cleanupProfiling()
 	})
 
+	t.Run("runs all cleanup callbacks and retains their errors", func(t *testing.T) {
+		cleanupProfiling()
+
+		firstErr := errors.New("first cleanup failed")
+		secondErr := errors.New("second cleanup failed")
+		var calls []int
+		stopProfilingQueue = []func() error{
+			func() error { calls = append(calls, 1); return firstErr },
+			nil,
+			func() error { calls = append(calls, 2); return nil },
+			func() error { calls = append(calls, 3); return secondErr },
+		}
+
+		err := StopProfiling()
+		assert.Equal(t, []int{1, 2, 3}, calls)
+		assert.ErrorIs(t, err, firstErr)
+		assert.ErrorIs(t, err, secondErr)
+		assert.Empty(t, stopProfilingQueue)
+		assert.NoError(t, StopProfiling())
+		assert.Equal(t, []int{1, 2, 3}, calls)
+	})
+
+	t.Run("successful cleanup callbacks run only once", func(t *testing.T) {
+		cleanupProfiling()
+
+		calls := 0
+		stopProfilingQueue = []func() error{
+			func() error { calls++; return nil },
+		}
+
+		assert.NoError(t, StopProfiling())
+		assert.NoError(t, StopProfiling())
+		assert.Equal(t, 1, calls)
+		assert.Empty(t, stopProfilingQueue)
+	})
+
 	t.Run("successful profiling start and stop", func(t *testing.T) {
 		cleanupProfiling()
 
@@ -92,6 +128,7 @@ func TestProfiling(t *testing.T) {
 
 		err = StopProfiling()
 		assert.NoError(t, err)
+		assert.NoError(t, StopProfiling())
 
 		assert.FileExists(t, cpuFile)
 		assert.FileExists(t, memFile)

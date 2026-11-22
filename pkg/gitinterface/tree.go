@@ -80,7 +80,8 @@ func (r *Repository) GetEntriesInTree(treeID Hash) ([]TreeEntry, error) {
 	// of being on Ubuntu 22.04. 22.04 is still widely used in WSL2 environments.
 	// So, we're removing --format and parsing the output differently to handle
 	// the extra information for each entry we don't need.
-	stdOut, err := r.executor("ls-tree", treeID.String()).executeString()
+	// NUL-delimited output preserves filenames verbatim, including whitespace.
+	stdOut, err := r.executor("ls-tree", "-z", treeID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to enumerate items in tree '%s': %w", treeID.String(), err)
 	}
@@ -89,18 +90,18 @@ func (r *Repository) GetEntriesInTree(treeID Hash) ([]TreeEntry, error) {
 		return nil, nil // alternatively, just check if treeID is empty tree?
 	}
 
-	lines := strings.Split(stdOut, "\n")
+	lines := strings.Split(strings.TrimSuffix(stdOut, "\x00"), "\x00")
 	entries := make([]TreeEntry, 0, len(lines))
 	for _, line := range lines {
 		// Without --format, the output is in the following format:
 		// <mode> SP <type> SP <object> TAB <file>
 		// From: https://git-scm.com/docs/git-ls-tree/2.34.1#_output_format
 
-		fields := strings.Split(line, " ")
+		fields := strings.SplitN(line, " ", 3)
 		// fields[0] is <mode> -- discard
 		// fields[1] is <type> -- blob or tree
 		// fields[2] is <object> TAB <file>
-		objectAndName := strings.Split(fields[2], "\t")
+		objectAndName := strings.SplitN(fields[2], "\t", 2)
 
 		hash, err := NewHash(objectAndName[0])
 		if err != nil {
@@ -126,7 +127,8 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 	// of being on Ubuntu 22.04. 22.04 is still widely used in WSL2 environments.
 	// So, we're removing --format and parsing the output differently to handle
 	// the extra information for each entry we don't need.
-	stdOut, err := r.executor("ls-tree", "-r", treeID.String()).executeString()
+	// NUL-delimited output preserves filenames verbatim, including whitespace.
+	stdOut, err := r.executor("ls-tree", "-r", "-z", treeID.String()).executeString()
 	if err != nil {
 		return nil, fmt.Errorf("unable to enumerate all files in tree: %w", err)
 	}
@@ -135,7 +137,7 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 		return nil, nil // alternatively, just check if treeID is empty tree?
 	}
 
-	entries := strings.Split(stdOut, "\n")
+	entries := strings.Split(strings.TrimSuffix(stdOut, "\x00"), "\x00")
 	if len(entries) == 0 {
 		return nil, nil
 	}
@@ -146,11 +148,11 @@ func (r *Repository) GetAllFilesInTree(treeID Hash) (map[string]Hash, error) {
 		// <mode> SP <type> SP <object> TAB <file>
 		// From: https://git-scm.com/docs/git-ls-tree/2.34.1#_output_format
 
-		entrySplit := strings.Split(entry, " ")
+		entrySplit := strings.SplitN(entry, " ", 3)
 		// entrySplit[0] is <mode> -- discard
 		// entrySplit[1] is <type> -- discard
 		// entrySplit[2] is <object> TAB <file> -- keep
-		entrySplit = strings.Split(entrySplit[2], "\t")
+		entrySplit = strings.SplitN(entrySplit[2], "\t", 2)
 
 		// <object> is really the object ID
 		hash, err := NewHash(entrySplit[0])
@@ -176,7 +178,11 @@ func (r *Repository) GetMergeTree(commitAID, commitBID Hash) (Hash, error) {
 
 	if commitAID.IsZero() {
 		// fast-forward merge -> use tree ID from commitB
-		return r.GetCommitTreeID(commitBID)
+		commitBInfo, err := r.GetCommitInfo(commitBID)
+		if err != nil {
+			return ZeroHash, err
+		}
+		return commitBInfo.TreeID, nil
 	}
 
 	// Only commitB needs to be non-zero, we can allow fast-forward merges when
@@ -220,11 +226,11 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 
 	entries := []TreeEntry{}
 	if !currentTip.IsZero() {
-		currentRefTree, err := r.GetCommitTreeID(currentTip)
+		currentRefCommitInfo, err := r.GetCommitInfo(currentTip)
 		if err != nil {
 			return nil, err
 		}
-		currentFiles, err := r.GetAllFilesInTree(currentRefTree)
+		currentFiles, err := r.GetAllFilesInTree(currentRefCommitInfo.TreeID)
 		if err != nil {
 			return nil, err
 		}
@@ -250,10 +256,11 @@ func (r *Repository) CreateSubtreeFromUpstreamRepository(upstream *Repository, u
 	// Remove trailing "/" now
 	localPath = strings.TrimSuffix(localPath, "/")
 
-	treeID, err := upstream.GetCommitTreeID(upstreamCommitID)
+	upstreamCommitInfo, err := upstream.GetCommitInfo(upstreamCommitID)
 	if err != nil {
 		return nil, err
 	}
+	treeID := upstreamCommitInfo.TreeID
 
 	if upstreamPath != "" {
 		// If upstreamPath is empty, then the entire tree is copied over,

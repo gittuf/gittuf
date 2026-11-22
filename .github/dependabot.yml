@@ -17,6 +17,8 @@ updates:
     open-pull-requests-limit: 10
     cooldown:
       default-days: 7
+    ignore:
+      - dependency-name: "github.com/charmbracelet/x/exp/teatest"
   # Monitor GitHub Actions
   - package-ecosystem: "github-actions"
     directory: "/"

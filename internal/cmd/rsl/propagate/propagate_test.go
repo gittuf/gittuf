@@ -7,11 +7,20 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/internal/cmd"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestPropagate(t *testing.T) {
+	t.Run("not in dev mode", func(t *testing.T) {
+		t.Setenv(dev.DevModeKey, "0")
+		_, _, _, err := cmd.ExecuteCommandC(New())
+		assert.ErrorIs(t, err, dev.ErrNotInDevMode)
+	})
+
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("no repository", func(t *testing.T) {
 		tmpDir := t.TempDir()
 		t.Chdir(tmpDir)

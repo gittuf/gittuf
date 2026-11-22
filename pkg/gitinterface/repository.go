@@ -227,7 +227,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 	if err != nil {
 		return nil, err
 	}
-	slog.Debug(fmt.Sprintf("Setting git directory for repository to '%s'...", absPath))
+	slog.Debug("Setting git directory for repository", "path", absPath)
 	repo.gitDirPath = absPath
 
 	objectFormat, err := repo.readObjectFormat()
@@ -243,12 +243,13 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 // accepts the arguments to the `git` binary, but the binary itself must not be
 // specified.
 type executor struct {
-	r           *Repository
-	args        []string
-	env         []string
-	stdIn       io.Reader
-	dir         string
-	unsetGitDir bool
+	r              *Repository
+	args           []string
+	env            []string
+	stdIn          io.Reader
+	dir            string
+	unsetGitDir    bool
+	preserveSpaces bool
 }
 
 // executor initializes a new executor instance to run a Git command with the
@@ -285,6 +286,11 @@ func (e *executor) withStdIn(stdIn *bytes.Buffer) *executor {
 	return e
 }
 
+func (e *executor) withPreserveSpaces() *executor {
+	e.preserveSpaces = true
+	return e
+}
+
 // executeString runs the constructed Git command and returns the contents of
 // stdout.  Leading and trailing spaces and newlines are removed. This function
 // should be used almost every time; the only exception is when the output is
@@ -304,6 +310,9 @@ func (e *executor) executeString() (string, error) {
 		return "", fmt.Errorf("unable to read stdout contents: %w", err)
 	}
 
+	if e.preserveSpaces {
+		return string(stdOutContents), nil
+	}
 	return strings.TrimSpace(string(stdOutContents)), nil
 }
 
@@ -320,6 +329,7 @@ func (e *executor) execute() (io.Reader, io.Reader, error) {
 	cmd.Env = e.env
 	cmd.Env = append(cmd.Env, "LC_ALL=C")                 // force git to the C (and thus english) locale
 	cmd.Env = append(cmd.Env, "GIT_NO_REPLACE_OBJECTS=1") // ignore refs/replace/ so verification reads reflect the true objects, matching the replace-blind go-git reads
+	cmd.Env = append(cmd.Env, "GIT_GRAFT_FILE=/dev/null") // ignore info/grafts so commit parents reflect the true objects, matching the graft-blind go-git reads
 	if e.dir != "" {
 		cmd.Dir = e.dir
 	}

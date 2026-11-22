@@ -50,24 +50,24 @@ func PropagateChangesFromUpstreamRepository(downstreamRepo DownstreamRepository,
 			return err // TODO: should we handle this differently?
 		}
 
-		currentTreeID, err := downstreamRepo.GetCommitTreeID(currentRefTip)
+		currentCommitInfo, err := downstreamRepo.GetCommitInfo(currentRefTip)
 		if err != nil {
 			return err // TODO: should we handle this differently?
 		}
 
-		currentPathTreeID, err := downstreamRepo.GetPathIDInTree(currentTreeID, detail.GetDownstreamPath())
+		currentPathTreeID, err := downstreamRepo.GetPathIDInTree(currentCommitInfo.TreeID, detail.GetDownstreamPath())
 		if err != nil {
 			if !errors.Is(err, gitinterface.ErrTreeDoesNotHavePath) {
 				return err
 			}
 		}
 
-		upstreamTreeID, err := upstreamRepo.GetCommitTreeID(latestUpstreamEntry.GetTargetID())
+		upstreamCommitInfo, err := upstreamRepo.GetCommitInfo(latestUpstreamEntry.GetTargetID())
 		if err != nil {
 			return err
 		}
 
-		if !currentPathTreeID.IsZero() && currentPathTreeID.Equal(upstreamTreeID.Bytes()) {
+		if !currentPathTreeID.IsZero() && currentPathTreeID.Equal(upstreamCommitInfo.TreeID.Bytes()) {
 			// Nothing to do
 			continue
 		}

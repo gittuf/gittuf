@@ -203,29 +203,41 @@ func (r *RootMetadata) AddGitHubAppPrincipal(name string, key tuf.Principal) err
 }
 
 // DeleteGitHubAppPrincipal removes the special GitHub app role from the root
-// metadata.
-func (r *RootMetadata) DeleteGitHubAppPrincipal(name string) {
-	if r.GitHubApps == nil {
-		return
+// metadata. It returns tuf.ErrGitHubAppNotFound if no app with the specified
+// name exists.
+func (r *RootMetadata) DeleteGitHubAppPrincipal(name string) error {
+	if _, has := r.GitHubApps[name]; !has {
+		return tuf.ErrGitHubAppNotFound
 	}
 
 	delete(r.GitHubApps, name)
+	return nil
 }
 
 // EnableGitHubAppApprovals sets GitHubApprovalsTrusted to true in the
-// root metadata.
-func (r *RootMetadata) EnableGitHubAppApprovals(appName string) {
-	if appEntry, has := r.GitHubApps[appName]; has {
-		appEntry.Trusted = true
+// root metadata. It returns tuf.ErrGitHubAppNotFound if no app with the
+// specified name exists.
+func (r *RootMetadata) EnableGitHubAppApprovals(appName string) error {
+	appEntry, has := r.GitHubApps[appName]
+	if !has {
+		return tuf.ErrGitHubAppNotFound
 	}
+
+	appEntry.Trusted = true
+	return nil
 }
 
 // DisableGitHubAppApprovals sets GitHubApprovalsTrusted to false in the root
-// metadata.
-func (r *RootMetadata) DisableGitHubAppApprovals(appName string) {
-	if appEntry, has := r.GitHubApps[appName]; has {
-		appEntry.Trusted = false
+// metadata. It returns tuf.ErrGitHubAppNotFound if no app with the specified
+// name exists.
+func (r *RootMetadata) DisableGitHubAppApprovals(appName string) error {
+	appEntry, has := r.GitHubApps[appName]
+	if !has {
+		return tuf.ErrGitHubAppNotFound
 	}
+
+	appEntry.Trusted = false
+	return nil
 }
 
 func (r *RootMetadata) GetGitHubAppEntries() (map[string]tuf.GitHubApp, error) {
@@ -507,20 +519,29 @@ func (r *RootMetadata) AddPropagationDirective(directive tuf.PropagationDirectiv
 // UpdatePropagationDirective updates a propagation directive in the root
 // metadata.
 func (r *RootMetadata) UpdatePropagationDirective(directive tuf.PropagationDirective) error {
-	updatedPropagationDirectives := []tuf.PropagationDirective{}
-	found := false
-
 	if len(r.Propagations) == 0 {
 		return tuf.ErrPropagationDirectiveNotFound
 	}
+
+	updatedPropagationDirectives := []tuf.PropagationDirective{}
+	found := false
 
 	for _, oldPropagationDirective := range r.Propagations {
 		if oldPropagationDirective.GetName() == directive.GetName() {
 			found = true
 			updatedPropagationDirectives = append(updatedPropagationDirectives, directive)
-		} else {
-			updatedPropagationDirectives = append(updatedPropagationDirectives, oldPropagationDirective)
+			continue
 		}
+
+		if oldPropagationDirective.GetUpstreamRepository() == directive.GetUpstreamRepository() &&
+			oldPropagationDirective.GetUpstreamReference() == directive.GetUpstreamReference() &&
+			oldPropagationDirective.GetUpstreamPath() == directive.GetUpstreamPath() &&
+			oldPropagationDirective.GetDownstreamReference() == directive.GetDownstreamReference() &&
+			oldPropagationDirective.GetDownstreamPath() == directive.GetDownstreamPath() {
+			return tuf.ErrPropagationDirectiveAlreadyExists
+		}
+
+		updatedPropagationDirectives = append(updatedPropagationDirectives, oldPropagationDirective)
 	}
 
 	if !found {

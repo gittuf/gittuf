@@ -98,7 +98,7 @@ func (r *Repository) InitializeRoot(ctx context.Context, signer sslibdsse.Signer
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Signing initial root metadata using '%s'...", publicKey.KeyID))
+	slog.Debug("Signing initial root metadata", "keyID", publicKey.KeyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -415,7 +415,7 @@ func (r *Repository) AddGitHubApp(ctx context.Context, signer sslibdsse.SignerVe
 
 	slog.Debug("Adding GitHub app key...")
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	if err := rootMetadata.AddGitHubAppPrincipal(appName, appKey); err != nil {
@@ -460,10 +460,12 @@ func (r *Repository) RemoveGitHubApp(ctx context.Context, signer sslibdsse.Signe
 
 	slog.Debug("Removing GitHub app key...")
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
-	rootMetadata.DeleteGitHubAppPrincipal(appName)
+	if err := rootMetadata.DeleteGitHubAppPrincipal(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Remove GitHub app key from root"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -502,7 +504,7 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
 	if rootMetadata.IsGitHubAppApprovalTrusted(appName) {
@@ -511,7 +513,9 @@ func (r *Repository) TrustGitHubApp(ctx context.Context, signer sslibdsse.Signer
 	}
 
 	slog.Debug("Marking GitHub app approvals as trusted in root...")
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	if err := rootMetadata.EnableGitHubAppApprovals(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Mark GitHub app approvals as trusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -550,16 +554,26 @@ func (r *Repository) UntrustGitHubApp(ctx context.Context, signer sslibdsse.Sign
 	}
 
 	if appName == "" {
-		slog.Debug(fmt.Sprintf("Using default app name '%s'...", tuf.GitHubAppRoleName))
+		slog.Debug("Using default app name", "appName", tuf.GitHubAppRoleName)
 		appName = tuf.GitHubAppRoleName
 	}
-	if !rootMetadata.IsGitHubAppApprovalTrusted(appName) {
+	apps, err := rootMetadata.GetGitHubAppEntries()
+	if err != nil {
+		return err
+	}
+	app, has := apps[appName]
+	if !has {
+		return tuf.ErrGitHubAppNotFound
+	}
+	if !app.IsTrusted() {
 		slog.Debug("GitHub app approvals are already untrusted, exiting...")
 		return nil
 	}
 
 	slog.Debug("Marking GitHub app approvals as untrusted in root...")
-	rootMetadata.DisableGitHubAppApprovals(appName)
+	if err := rootMetadata.DisableGitHubAppApprovals(appName); err != nil {
+		return err
+	}
 
 	commitMessage := "Mark GitHub app approvals as untrusted"
 	return r.updateRootMetadata(ctx, state, signer, rootMetadata, commitMessage, options.CreateRSLEntry, signCommit)
@@ -858,6 +872,10 @@ func (r *Repository) RemoveGlobalRule(ctx context.Context, signer sslibdsse.Sign
 }
 
 func (r *Repository) AddPropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, directiveName, upstreamRepository, upstreamReference, upstreamPath, downstreamReference, downstreamPath string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -991,6 +1009,10 @@ func (r *Repository) IncrementRootVersion(ctx context.Context, signer sslibdsse.
 }
 
 func (r *Repository) RemovePropagationDirective(ctx context.Context, signer sslibdsse.SignerVerifier, name string, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1037,7 +1059,7 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 	}
 
 	slog.Debug("Loading current policy...")
-	state, err := policy.LoadCurrentState(ctx, r.r, policyRef)
+	state, err := r.loadStateForInspection(ctx, policyRef)
 	if err != nil {
 		return nil, err
 	}
@@ -1054,6 +1076,10 @@ func (r *Repository) ListPropagationDirectives(ctx context.Context, policyRef st
 // EnableController makes the current repository a "controller" repository used
 // to specify gittuf policies for other repositories.
 func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1096,6 +1122,10 @@ func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.Sign
 // gittuf repositories. Any policies declared in this repository will not be
 // enforced for other repositories part of the network.
 func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.SignerVerifier, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1137,6 +1167,10 @@ func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.Sig
 // AddControllerRepository adds a repository as a controller to the current
 // repository.
 func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1178,6 +1212,10 @@ func (r *Repository) AddControllerRepository(ctx context.Context, signer sslibds
 // AddNetworkRepository adds a repository as part of the network overseen by the
 // current repository.
 func (r *Repository) AddNetworkRepository(ctx context.Context, signer sslibdsse.SignerVerifier, repositoryName, repositoryLocation string, initialRootPrincipals []tuf.Principal, signCommit bool, opts ...trustpolicyopts.Option) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	if signCommit {
 		slog.Debug("Checking if Git signing is configured...")
 		err := r.r.CanSign()
@@ -1245,7 +1283,7 @@ func (r *Repository) SignRoot(ctx context.Context, signer sslibdsse.SignerVerifi
 
 	env := state.Metadata.RootEnvelope
 
-	slog.Debug(fmt.Sprintf("Signing root metadata using '%s'...", keyID))
+	slog.Debug("Signing root metadata", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err

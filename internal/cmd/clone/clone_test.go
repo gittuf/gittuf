@@ -16,8 +16,8 @@ func TestClone(t *testing.T) {
 		assert.ErrorContains(t, err, "accepts between 1 and 2 arg(s)")
 	})
 
-	t.Run("invalid root key", func(t *testing.T) {
+	t.Run("invalid remote", func(t *testing.T) {
 		_, _, _, err := cmd.ExecuteCommandC(New(), "/non/existent/path", "--root-key", "/non/existent/key")
-		assert.ErrorContains(t, err, "failed to run command")
+		assert.ErrorContains(t, err, "unable to clone repository")
 	})
 }

@@ -143,6 +143,29 @@ func TestRootMetadata(t *testing.T) {
 		assert.Equal(t, 1, len(directives))
 		assert.Equal(t, updatedDirective, directives[0])
 
+		otherDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.com/git/other-repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "other-upstream/",
+		}
+		err = rootMetadata.AddPropagationDirective(otherDirective)
+		assert.NoError(t, err)
+
+		collidingDirective := &PropagationDirective{
+			Name:                "other-test",
+			UpstreamRepository:  "https://example.org/git/repository",
+			UpstreamReference:   "refs/heads/main",
+			DownstreamReference: "refs/heads/main",
+			DownstreamPath:      "upstream/",
+		}
+		err = rootMetadata.UpdatePropagationDirective(collidingDirective)
+		assert.ErrorIs(t, err, tuf.ErrPropagationDirectiveAlreadyExists)
+
+		err = rootMetadata.DeletePropagationDirective("other-test")
+		assert.NoError(t, err)
+
 		err = rootMetadata.DeletePropagationDirective("test")
 		assert.Nil(t, err)
 
@@ -263,7 +286,7 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	keyPath := filepath.Join(tmpDir, "rsa")
 	sslibKeyO, err := ssh.NewKeyFromFile(keyPath)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	sslibKey := NewKeyFromSSLibKey(sslibKeyO)
 
@@ -298,12 +321,12 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	ctx := context.Background()
 	env, err := dsse.CreateEnvelope(rootMetadata)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 
 	verifier, err := ssh.NewVerifierFromKey(sslibKeyO)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	signer := &ssh.Signer{
 		Verifier: verifier,
@@ -312,18 +335,18 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	// Unwrap and verify
 	// NOTE: For the sake of testing the contained key, we unwrap before we
 	// verify. Typically, in DSSE it should be the other way around.
 	payload, err := env.DecodeB64Payload()
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	rootMetadata2 := &RootMetadata{}
 	if err := json.Unmarshal(payload, rootMetadata2); err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 
 	sslibKey2 := rootMetadata2.Keys[sslibKey.KeyID]
@@ -331,11 +354,11 @@ func TestRootMetadataUnmarshalling(t *testing.T) {
 	// NOTE: Typically, a caller would choose this method, if KeyType==ssh.SSHKeyType
 	verifier2, err := ssh.NewVerifierFromKey(sslibKey2.Keys()[0])
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 	_, err = dsse.VerifyEnvelope(ctx, env, []sslibdsse.Verifier{verifier2}, 1)
 	if err != nil {
-		t.Fatal()
+		t.Fatal(err)
 	}
 }
 
@@ -480,15 +503,22 @@ func TestDeleteGitHubAppPrincipal(t *testing.T) {
 	rootMetadata := initialTestRootMetadata(t)
 
 	// Cover nil check
-	rootMetadata.DeleteGitHubAppPrincipal("")
+	err := rootMetadata.DeleteGitHubAppPrincipal("")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
 	assert.Nil(t, rootMetadata.GitHubApps)
 
 	appKey := NewKeyFromSSLibKey(ssh.NewKeyFromBytes(t, targets1PubKeyBytes))
 
-	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
+	err = rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, appKey)
 	assert.Nil(t, err)
 
-	rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
+	// Non-existent app when other apps are present
+	err = rootMetadata.DeleteGitHubAppPrincipal("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.Contains(t, rootMetadata.GitHubApps, tuf.GitHubAppRoleName)
+
+	err = rootMetadata.DeleteGitHubAppPrincipal(tuf.GitHubAppRoleName)
+	assert.NoError(t, err)
 	assert.NotContains(t, rootMetadata.GitHubApps, tuf.GitHubAppRoleName)
 }
 
@@ -501,8 +531,13 @@ func TestEnableGitHubAppApprovals(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
 	require.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	err = rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.NoError(t, err)
 	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
+
+	err = rootMetadata.EnableGitHubAppApprovals("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.NotContains(t, rootMetadata.GitHubApps, "does-not-exist")
 }
 
 func TestDisableGitHubAppApprovals(t *testing.T) {
@@ -514,11 +549,17 @@ func TestDisableGitHubAppApprovals(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(appName, appKey)
 	require.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(appName)
+	err = rootMetadata.EnableGitHubAppApprovals(appName)
+	assert.NoError(t, err)
 	assert.True(t, rootMetadata.GitHubApps[appName].Trusted)
 
-	rootMetadata.DisableGitHubAppApprovals(appName)
+	err = rootMetadata.DisableGitHubAppApprovals(appName)
+	assert.NoError(t, err)
 	assert.False(t, rootMetadata.GitHubApps[appName].Trusted)
+
+	err = rootMetadata.DisableGitHubAppApprovals("does-not-exist")
+	assert.ErrorIs(t, err, tuf.ErrGitHubAppNotFound)
+	assert.NotContains(t, rootMetadata.GitHubApps, "does-not-exist")
 }
 
 func TestGetGitHubAppEntries(t *testing.T) {
@@ -683,7 +724,8 @@ func TestIsGitHubAppApprovalTrusted(t *testing.T) {
 	err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
 	assert.Nil(t, err)
 
-	rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	err = rootMetadata.EnableGitHubAppApprovals(tuf.GitHubAppRoleName)
+	assert.NoError(t, err)
 	trusted := rootMetadata.IsGitHubAppApprovalTrusted(tuf.GitHubAppRoleName)
 	assert.True(t, trusted)
 }

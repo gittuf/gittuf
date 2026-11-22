@@ -1,10 +1,10 @@
 ## gittuf rsl propagate
 
-Propagate contents of remote repositories into local repository
+Propagate contents of remote repositories into local repository (developer mode only, set GITTUF_DEV=1)
 
 ### Synopsis
 
-The 'propagate' command propagates RSL contents from remote repositories defined in propagation directives into the local repository. It is used to record a snapshot of the propagated RSL and repository contents locally.
+The 'propagate' command propagates RSL contents from remote repositories defined in propagation directives into the local repository. It is used to record a snapshot of the propagated RSL and repository contents locally (developer mode only, set GITTUF_DEV=1).
 
 ```
 gittuf rsl propagate [flags]
@@ -13,19 +13,19 @@ gittuf rsl propagate [flags]
 ### Options
 
 ```
-  -h, --help   help for propagate
+  -h, --help[=true|false]   help for propagate
 ```
 
 ### Options inherited from parent commands
 
 ```
-      --no-color                     turn off colored output
-      --profile                      enable CPU and memory profiling
+      --no-color[=true|false]        turn off colored output
+      --profile[=true|false]         enable CPU and memory profiling
       --profile-CPU-file string      file to store CPU profile (default "cpu.prof")
       --profile-memory-file string   file to store memory profile (default "memory.prof")
-      --storer-trace                 report Git storage backend call counts, timings and git fork counts on exit
+      --storer-trace[=true|false]    report Git storage backend call counts, timings and git fork counts on exit
       --storer-trace-file string     file to store the Git storage backend trace (default "storer.trace")
-      --verbose                      enable verbose logging
+      --verbose[=true|false]         enable verbose logging
 ```
 
 ### SEE ALSO

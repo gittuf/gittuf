@@ -6,11 +6,13 @@ package display
 import (
 	"bytes"
 	"fmt"
+	"os/exec"
 	"runtime"
 	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type pagerTestCat struct{}
@@ -47,19 +49,97 @@ func TestPagerResolution(t *testing.T) {
 	t.Setenv("PAGER", "less")
 
 	pager := getPagerReal()
-	assert.Equal(t, "less", pager.getBinary())
-	assert.Equal(t, []string{}, pager.getFlags())
+	if _, err := exec.LookPath("less"); err != nil && runtime.GOOS == "windows" {
+		// Windows does not ship less. getPagerReal falls back to more, which is
+		// always present in System32, so accept it here. Fail only if neither
+		// pager can be found.
+		require.NotNil(t, pager)
+		assert.Equal(t, "more", pager.getBinary())
+		assert.Empty(t, pager.getFlags())
+	} else {
+		assert.Equal(t, "less", pager.getBinary())
+		assert.Equal(t, []string{}, pager.getFlags())
+	}
 
 	pager = newPagerLess()
 	assert.Equal(t, "less", pager.getBinary())
 	assert.Equal(t, []string{"-F", "-R", "-X"}, pager.getFlags())
 
-	t.Setenv("LESS", "A")
-	assert.Equal(t, []string{"-A"}, pager.getFlags())
+	// less reads $LESS itself, so no flags must be passed when it is set
+	for _, options := range []string{"A", "-R", "FRX", "-R --mouse"} {
+		t.Setenv("LESS", options)
+		assert.Nil(t, pager.getFlags(), "LESS=%q", options)
+	}
 
 	pager = newPagerMore()
 	assert.Equal(t, "more", pager.getBinary())
 	assert.Len(t, pager.getFlags(), 0)
+
+	// No pager is returned when none of the programs can be found
+	t.Setenv("PATH", "")
+	assert.Nil(t, getPagerReal())
+}
+
+func TestPagerWriteCloserStartError(t *testing.T) {
+	writer := &pagerWriteCloser{command: exec.Command("gittuf-nonexistent-pager")}
+
+	_, err := writer.Write([]byte("Hello, world!"))
+	assert.Error(t, err)
+}
+
+func TestPagerEnvVarSplitting(t *testing.T) {
+	tests := map[string]struct {
+		env    string
+		binary string
+		flags  []string
+	}{
+		"single spaces":               {env: "less -R", binary: "less", flags: []string{"-R"}},
+		"repeated spaces":             {env: "less  -R   -X", binary: "less", flags: []string{"-R", "-X"}},
+		"tab separated":               {env: "less\t-R", binary: "less", flags: []string{"-R"}},
+		"surrounding space":           {env: "  less -R  ", binary: "less", flags: []string{"-R"}},
+		"only whitespace":             {env: " \t ", binary: "", flags: nil},
+		"single quoted argument":      {env: "less -P 'page %f'", binary: "less", flags: []string{"-P", "page %f"}},
+		"double quoted argument":      {env: `less -P "page %f"`, binary: "less", flags: []string{"-P", "page %f"}},
+		"variables are not expanded":  {env: "less $HOME", binary: "less", flags: []string{"$HOME"}},
+		"backticks are not executed":  {env: "less `echo hi`", binary: "less", flags: []string{"`echo hi`"}},
+		"unterminated quote is unset": {env: "less -P 'page", binary: "", flags: nil},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("PAGER", test.env)
+
+			pager := newPagerEnvVar()
+			assert.Equal(t, test.binary, pager.getBinary())
+			assert.Equal(t, test.flags, pager.getFlags())
+		})
+	}
+}
+
+func TestPagerEnvVarWindowsPath(t *testing.T) {
+	if runtime.GOOS != "windows" {
+		t.Skip("backslash handling only applies on Windows")
+	}
+
+	tests := map[string]struct {
+		env    string
+		binary string
+		flags  []string
+	}{
+		"unquoted path":           {env: `C:\tools\less.exe -R`, binary: `C:\tools\less.exe`, flags: []string{"-R"}},
+		"quoted path with spaces": {env: `"C:\Program Files\Git\usr\bin\less.exe" -R`, binary: `C:\Program Files\Git\usr\bin\less.exe`, flags: []string{"-R"}},
+		"forward slashes":         {env: `C:/tools/less.exe -R`, binary: `C:/tools/less.exe`, flags: []string{"-R"}},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Setenv("PAGER", test.env)
+
+			pager := newPagerEnvVar()
+			assert.Equal(t, test.binary, pager.getBinary())
+			assert.Equal(t, test.flags, pager.getFlags())
+		})
+	}
 }
 
 func TestNewDisplayWriter(t *testing.T) {

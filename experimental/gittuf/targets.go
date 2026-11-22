@@ -317,7 +317,11 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	}
 
 	for _, principal := range authorizedPrincipals {
-		slog.Debug(fmt.Sprintf("Adding principal '%s' to rule file...", strings.TrimSpace(principal.ID())))
+		for keyID, principalIDs := range findReusedKeys(targetsMetadata.GetPrincipals(), principal) {
+			slog.Warn("Key is already held by another principal, make sure this is intended", "keyID", keyID, "principalID", principal.ID(), "heldBy", principalIDs)
+		}
+
+		slog.Debug("Adding principal to rule file", "principalID", strings.TrimSpace(principal.ID()))
 		if err := targetsMetadata.AddPrincipal(principal); err != nil {
 			return err
 		}
@@ -358,7 +362,11 @@ func (r *Repository) UpdatePrincipalInTargets(ctx context.Context, signer sslibd
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Updating principal '%s' in rule file...", strings.TrimSpace(principal.ID())))
+	for keyID, principalIDs := range findReusedKeys(targetsMetadata.GetPrincipals(), principal) {
+		slog.Warn("Key is already held by another principal, make sure this is intended", "keyID", keyID, "principalID", principal.ID(), "heldBy", principalIDs)
+	}
+
+	slog.Debug("Updating principal in rule file", "principalID", strings.TrimSpace(principal.ID()))
 	if err := targetsMetadata.UpdatePrincipal(principal); err != nil {
 		return err
 	}
@@ -398,7 +406,7 @@ func (r *Repository) RemovePrincipalFromTargets(ctx context.Context, signer ssli
 		return err
 	}
 
-	slog.Debug(fmt.Sprintf("Removing principal '%s' from rule file...", strings.TrimSpace(principalID)))
+	slog.Debug("Removing principal from rule file", "principalID", strings.TrimSpace(principalID))
 	if err := targetsMetadata.RemovePrincipal(principalID); err != nil {
 		return err
 	}
@@ -444,7 +452,7 @@ func (r *Repository) SignTargets(ctx context.Context, signer sslibdsse.SignerVer
 		env = state.Metadata.DelegationEnvelopes[targetsRoleName]
 	}
 
-	slog.Debug(fmt.Sprintf("Signing rule file using '%s'...", keyID))
+	slog.Debug("Signing rule file", "keyID", keyID)
 	env, err = dsse.SignEnvelope(ctx, env, signer)
 	if err != nil {
 		return err
@@ -518,4 +526,26 @@ func (r *Repository) updateTargetsMetadata(ctx context.Context, state *policy.St
 
 	slog.Debug("Committing policy...")
 	return state.Commit(r.r, commitMessage, createRSLEntry, signCommit)
+}
+
+// findReusedKeys returns the keys of the principal that are already used by
+// other principals in the rule file, mapped to the IDs of those principals.
+func findReusedKeys(existingPrincipals map[string]tuf.Principal, principal tuf.Principal) map[string][]string {
+	reusedKeys := map[string][]string{}
+
+	for existingID, existingPrincipal := range existingPrincipals {
+		if existingID == principal.ID() {
+			continue
+		}
+
+		for _, existingKey := range existingPrincipal.Keys() {
+			for _, key := range principal.Keys() {
+				if key.KeyID == existingKey.KeyID {
+					reusedKeys[key.KeyID] = append(reusedKeys[key.KeyID], existingID)
+				}
+			}
+		}
+	}
+
+	return reusedKeys
 }

@@ -80,7 +80,10 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		return tuf.ErrInvalidThreshold
 	}
 
-	if len(authorizedPrincipalIDs) < threshold {
+	// Duplicate principal IDs collapse into a single entry in the role, so the
+	// threshold must be checked against the unique principals.
+	principalIDs := set.NewSetFromItems(authorizedPrincipalIDs...)
+	if principalIDs.Len() < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
 
@@ -94,7 +97,7 @@ func (t *TargetsMetadata) AddRule(ruleName string, authorizedPrincipalIDs, ruleP
 		Paths:       rulePatterns,
 		Terminating: false,
 		Role: Role{
-			KeyIDs:    set.NewSetFromItems(authorizedPrincipalIDs...),
+			KeyIDs:    principalIDs,
 			Threshold: threshold,
 		},
 	}
@@ -119,7 +122,10 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		return tuf.ErrInvalidThreshold
 	}
 
-	if len(authorizedPrincipalIDs) < threshold {
+	// Duplicate principal IDs collapse into a single entry in the role, so the
+	// threshold must be checked against the unique principals.
+	principalIDs := set.NewSetFromItems(authorizedPrincipalIDs...)
+	if principalIDs.Len() < threshold {
 		return tuf.ErrCannotMeetThreshold
 	}
 
@@ -138,7 +144,7 @@ func (t *TargetsMetadata) UpdateRule(ruleName string, authorizedPrincipalIDs, ru
 		if delegation.Name == ruleName {
 			delegation.Paths = rulePatterns
 			delegation.Role = Role{
-				KeyIDs:    set.NewSetFromItems(authorizedPrincipalIDs...),
+				KeyIDs:    principalIDs,
 				Threshold: threshold,
 			}
 			ruleFound = true

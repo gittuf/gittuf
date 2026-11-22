@@ -68,8 +68,8 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		return err
 	}
 
-	fmt.Fprintln(cmd.OutOrStdout(), string(prettyJSON))
-	return nil
+	_, err = fmt.Fprintln(cmd.OutOrStdout(), string(prettyJSON))
+	return err
 }
 
 func New() *cobra.Command {

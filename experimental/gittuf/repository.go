@@ -5,7 +5,6 @@ package gittuf
 
 import (
 	"errors"
-	"fmt"
 	"log/slog"
 	"os"
 
@@ -75,7 +74,7 @@ func LoadRepository(repositoryPath string) (*Repository, error) {
 		})))
 	}
 
-	slog.Debug(fmt.Sprintf("Loading Git repository from '%s'...", repositoryPath))
+	slog.Debug("Loading Git repository", "path", repositoryPath)
 
 	if repositoryPath == "" {
 		return nil, gitinterface.ErrRepositoryPathNotSpecified

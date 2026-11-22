@@ -117,6 +117,10 @@ func (r *Repository) Status() (map[string]FileStatus, error) {
 			continue
 		}
 
+		if len(token) < 3 {
+			return nil, fmt.Errorf("unable to parse status record '%s'", token)
+		}
+
 		// first two characters are status codes, find the corresponding
 		// statuses
 		xb := token[0]
@@ -126,7 +130,7 @@ func (r *Repository) Status() (map[string]FileStatus, error) {
 
 		// then, we have a single space followed by the path, ignore space and
 		// read in the rest as the filepath
-		filePath := strings.TrimSpace(token[2:])
+		filePath := strings.TrimPrefix(token[2:], " ")
 
 		xStatus, err := NewStatusCodeFromByte(xb)
 		if err != nil {

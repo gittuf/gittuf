@@ -7,6 +7,7 @@ import (
 	"bytes"
 	"context"
 	"crypto"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -16,6 +17,7 @@ import (
 	"testing"
 
 	"github.com/ProtonMail/go-crypto/openpgp"
+	pgperrors "github.com/ProtonMail/go-crypto/openpgp/errors"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
 	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 	"github.com/stretchr/testify/require"
@@ -51,9 +53,14 @@ func (v *Verifier) MetadataKey() *signerverifier.SSLibKey {
 }
 
 // Verify implements the dsse.Verifier.Verify interface for GPG keys.
+// Key and signature expiration are ignored; trust is determined by policy.
 func (v *Verifier) Verify(_ context.Context, data []byte, sig []byte) error {
 	sigReader := bytes.NewReader(sig)
 	_, err := openpgp.CheckArmoredDetachedSignature(openpgp.EntityList{v.entity}, bytes.NewReader(data), sigReader, nil)
+	// OpenPGP verifies the signature and checks revocation before expiration.
+	if errors.Is(err, pgperrors.ErrKeyExpired) || errors.Is(err, pgperrors.ErrSignatureExpired) {
+		return nil
+	}
 	if err != nil {
 		return fmt.Errorf("failed to verify gpg signature: %w", err)
 	}
@@ -116,6 +123,18 @@ func NewSignerFromKeyID(keyID string, opts ...SignerOption) (*Signer, error) {
 	return &Signer{Verifier: verifier, program: options.program}, nil
 }
 
+// LoadPublicKeyFromKeyID returns the public key for the specified GPG key ID.
+// The key is exported using the GPG program set via WithGPGProgram, or "gpg"
+// if no program is set.
+func LoadPublicKeyFromKeyID(keyID string, opts ...SignerOption) (*signerverifier.SSLibKey, error) {
+	options := &SignerOptions{program: defaultGPGProgram}
+	for _, fn := range opts {
+		fn(options)
+	}
+
+	return getPublicKeyForKeyID(keyID, options.program)
+}
+
 // LoadGPGKeyFromBytes returns a signerverifier.SSLibKey for a GPG / PGP key passed in as
 // armored bytes. The returned signerverifier.SSLibKey uses the primary key's fingerprint as the
 // key ID.
@@ -147,9 +166,16 @@ func LoadGPGKeyFromBytes(contents []byte) (*signerverifier.SSLibKey, error) {
 
 func getPublicKeyForKeyID(keyID, program string) (*signerverifier.SSLibKey, error) {
 	cmd := exec.Command(program, "--batch", "--armor", "--export", keyID) //nolint:gosec
-	output, err := cmd.CombinedOutput()
+	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, string(output))
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+			return nil, fmt.Errorf("failed to run command %v: %w %s", cmd, err, exitErr.Stderr)
+		}
+		return nil, fmt.Errorf("failed to run command %v: %w", cmd, err)
+	}
+
+	if len(output) == 0 {
+		return nil, fmt.Errorf("no GPG key found for key ID %s", keyID)
 	}
 
 	return LoadGPGKeyFromBytes(output)

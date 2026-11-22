@@ -687,11 +687,11 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 
 		// The current remote tip must be the parent of the current
 		// local tip
-		parents, err := localRepo.r.GetCommitParentIDs(currentLocalRSLTip)
+		currentLocalRSLTipInfo, err := localRepo.r.GetCommitInfo(currentLocalRSLTip)
 		if err != nil {
 			t.Fatal(err)
 		}
-		assert.Equal(t, currentRemoteRSLTip, parents[0])
+		assert.Equal(t, currentRemoteRSLTip, currentLocalRSLTipInfo.ParentIDs[0])
 
 		// The current local tip and original local tip must have same
 		// entry ref and target ID
@@ -706,6 +706,180 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 
 		assert.Equal(t, originalEntry.(*rsl.ReferenceEntry).RefName, currentEntry.(*rsl.ReferenceEntry).RefName)
 		assert.Equal(t, originalEntry.(*rsl.ReferenceEntry).TargetID, currentEntry.(*rsl.ReferenceEntry).TargetID)
+	})
+
+	t.Run("remote and local have diverged, skip annotation on reapplied entry is preserved", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate remote actions on refName, so local and remote diverge
+		// without touching the same ref
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions: record an entry for a different ref, then
+		// immediately skip it via an annotation
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		skippedEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if err := localRepo.RecordRSLAnnotation(testCtx, []string{skippedEntryID.String()}, true, "skip bad entry", false, rslopts.WithAnnotateLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Sanity check: prior to reconciliation, the entry is skipped
+		latestBefore, annotationsBefore, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Equal(t, skippedEntryID, latestBefore.GetID())
+		require.True(t, latestBefore.(*rsl.ReferenceEntry).SkippedBy(annotationsBefore))
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.NoError(t, err)
+
+		// After reconciliation, the reapplied entry (which now has a
+		// different ID) must still be marked as skipped by the reapplied
+		// annotation
+		latestAfter, annotationsAfter, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		assert.NotEqual(t, skippedEntryID, latestAfter.GetID(), "test is invalid if entry's ID didn't change on reapply")
+		assert.True(t, latestAfter.(*rsl.ReferenceEntry).SkippedBy(annotationsAfter), "skip annotation must still apply to the reapplied entry")
+	})
+
+	t.Run("remote and local have diverged, annotation separated from its target is preserved", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate remote actions on refName, so local and remote diverge
+		// without touching the same ref
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate local actions: record an entry for a different ref...
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+		annotatedEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// ...then record one more, unrelated entry before annotating the
+		// first one, so the annotation is not immediately adjacent to its
+		// target in the RSL
+		if _, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Test commit 2", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := localRepo.RecordRSLEntryForReference(testCtx, anotherRefName, false, rslopts.WithRecordLocalOnly(), rslopts.WithSkipCheckForDuplicateEntry()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Not a skip, just informational
+		if err := localRepo.RecordRSLAnnotation(testCtx, []string{annotatedEntryID.String()}, false, "informational note", false, rslopts.WithAnnotateLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.NoError(t, err)
+
+		// Walk the reconciled RSL for anotherRefName and confirm the
+		// reapplied annotation refers to the reapplied entry it originally
+		// annotated, using the entry's new ID rather than the stale one
+		firstEntry, _, err := rsl.GetFirstReferenceUpdaterEntryForRef(localRepo.r, anotherRefName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		lastEntry, _, err := rsl.GetLatestReferenceUpdaterEntry(localRepo.r, rsl.ForReference(anotherRefName))
+		if err != nil {
+			t.Fatal(err)
+		}
+		entries, annotationMap, err := rsl.GetReferenceUpdaterEntriesInRangeForRef(localRepo.r, firstEntry.GetID(), lastEntry.GetID(), anotherRefName)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.Len(t, entries, 2)
+
+		reapplyingEntryID := entries[0].GetID()
+		assert.NotEqual(t, annotatedEntryID, reapplyingEntryID, "test is invalid if entry's ID didn't change on reapply")
+
+		annotations, has := annotationMap[reapplyingEntryID.String()]
+		require.True(t, has, "reapplied annotation must still refer to the reapplied entry")
+		require.Len(t, annotations, 1)
+		assert.Equal(t, "informational note", annotations[0].Message)
 	})
 
 	t.Run("remote and local have diverged but modify same ref", func(t *testing.T) {
@@ -1005,6 +1179,112 @@ func TestSync(t *testing.T) {
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
 		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
 		assert.NotEqual(t, originalRSLTip, currentRSLTip)
+	})
+
+	t.Run("local is strictly ahead of remote with propagation entry", func(t *testing.T) {
+		propagatedRefName := "refs/heads/propagated"
+
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, true)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate local propagation into a ref that the remote doesn't have
+		propagatedCommitID, err := localRepo.r.Commit(emptyTreeHash, propagatedRefName, "Propagated commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry(propagatedRefName, propagatedCommitID, "https://example.com/upstream", upstreamEntryID).Commit(localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.NoError(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Remote must have both the RSL and the propagated ref
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, propagatedRefName)
+	})
+
+	t.Run("local is strictly behind remote with propagation entry", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate propagation on the remote
+		propagatedCommitID, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Propagated commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntryID, err := remoteRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry(refName, propagatedCommitID, "https://example.com/upstream", upstreamEntryID).Commit(remoteRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		divergedRefs, err := localRepo.Sync(testCtx, remoteName, false, false)
+		assert.NoError(t, err)
+		assert.Empty(t, divergedRefs)
+
+		// Local ref must be updated to the propagated commit
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, rsl.Ref)
+		assertLocalAndRemoteRefsMatch(t, localR, remoteR, refName)
 	})
 
 	t.Run("local RSL has diverged, not allowed to overwrite", func(t *testing.T) {
@@ -1307,6 +1587,8 @@ func TestPullRSL(t *testing.T) {
 }
 
 func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
+	t.Setenv(dev.DevModeKey, "1")
+
 	t.Run("single upstream repo", func(t *testing.T) {
 		// Create upstreamRepo
 		upstreamRepoLocation := t.TempDir()
@@ -1405,10 +1687,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamRepoLocation, propagationEntry.UpstreamRepository)
 		assert.Equal(t, upstreamEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1564,10 +1847,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, upstreamEntry1.GetID(), propagationEntry1.UpstreamEntryID)
 		assert.Equal(t, upstreamEntry2.GetID(), propagationEntry2.UpstreamEntryID)
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath1)
 		if err != nil {
 			t.Fatal(err)
@@ -1748,10 +2032,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1763,10 +2048,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		assert.Equal(t, expectedRootTreeID, downstreamRootTreeID)
 
 		// Do the same thing for the other propagation entry's tree (this is a different ref!)
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry1.TargetID.Bytes()))
+		downstreamRootCommitInfo, err = downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry1.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTreeID, err = downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath)
 		if err != nil {
 			t.Fatal(err)
@@ -1946,10 +2232,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		expectedUpstreamIDs.Remove(propagationEntry2.UpstreamEntryID.String())
 		assert.Equal(t, 0, expectedUpstreamIDs.Len())
 
-		downstreamRootTreeID, err = downstreamRepo.r.GetCommitTreeID(githash.Hash(propagationEntry2.TargetID.Bytes()))
+		downstreamRootCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(propagationEntry2.TargetID.Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamRootTreeID = downstreamRootCommitInfo.TreeID
 		pathTree1ID, err := downstreamRepo.r.GetPathIDInTree(downstreamRootTreeID, localPath1)
 		if err != nil {
 			t.Fatal(err)
@@ -2031,10 +2318,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		}
 		assert.Equal(t, controllerPolicyEntry.GetID(), propagationEntry.UpstreamEntryID)
 
-		controllerPolicyTreeID, err := controllerRepo.r.GetCommitTreeID(githash.Hash(controllerPolicyEntry.GetTargetID().Bytes()))
+		controllerPolicyCommitInfo, err := controllerRepo.r.GetCommitInfo(githash.Hash(controllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		controllerPolicyTreeID := controllerPolicyCommitInfo.TreeID
 		controllerMetadataTreeID, err := controllerRepo.r.GetPathIDInTree(controllerPolicyTreeID, "metadata")
 		if err != nil {
 			t.Fatal(err)
@@ -2044,10 +2332,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
+		downstreamPolicyCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamPolicyTreeID := downstreamPolicyCommitInfo.TreeID
 
 		encodedLocation := base64.URLEncoding.EncodeToString([]byte(controllerRepoLocation))
 		controllerPath := fmt.Sprintf("%s/controller-%s", tuf.GittufControllerPrefix, encodedLocation)
@@ -2133,10 +2422,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		downstreamPolicyTreeID, err := downstreamRepo.r.GetCommitTreeID(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
+		downstreamPolicyCommitInfo, err := downstreamRepo.r.GetCommitInfo(githash.Hash(downstreamPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		downstreamPolicyTreeID := downstreamPolicyCommitInfo.TreeID
 
 		encodedDirectControllerLocation := base64.URLEncoding.EncodeToString([]byte(directControllerRepoLocation))
 		directControllerPath := fmt.Sprintf("%s/direct-controller-%s", tuf.GittufControllerPrefix, encodedDirectControllerLocation)
@@ -2156,10 +2446,11 @@ func TestPropagateChangesFromUpstreamRepositories(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		leafControllerPolicyTreeID, err := leafControllerRepo.r.GetCommitTreeID(githash.Hash(leafControllerPolicyEntry.GetTargetID().Bytes()))
+		leafControllerPolicyCommitInfo, err := leafControllerRepo.r.GetCommitInfo(githash.Hash(leafControllerPolicyEntry.GetTargetID().Bytes()))
 		if err != nil {
 			t.Fatal(err)
 		}
+		leafControllerPolicyTreeID := leafControllerPolicyCommitInfo.TreeID
 		leafControllerMetadataTreeID, err := leafControllerRepo.r.GetPathIDInTree(leafControllerPolicyTreeID, "metadata")
 		if err != nil {
 			t.Fatal(err)

@@ -4,6 +4,7 @@
 package profile
 
 import (
+	"errors"
 	"os"
 	"runtime/pprof"
 )
@@ -41,13 +42,15 @@ func StartProfiling(cpuFile, memoryFile string) error {
 }
 
 func StopProfiling() error {
-	for _, f := range stopProfilingQueue {
+	queue := stopProfilingQueue
+	stopProfilingQueue = nil
+
+	var err error
+	for _, f := range queue {
 		if f != nil {
-			if err := f(); err != nil {
-				return err
-			}
+			err = errors.Join(err, f())
 		}
 	}
 
-	return nil
+	return err
 }

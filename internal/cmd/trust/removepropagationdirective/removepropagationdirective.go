@@ -4,9 +4,12 @@
 package removepropagationdirective
 
 import (
+	"fmt"
+
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
 	"github.com/gittuf/gittuf/internal/cmd/trust/persistent"
+	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/spf13/cobra"
 )
 
@@ -26,6 +29,10 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 }
 
 func (o *options) Run(cmd *cobra.Command, _ []string) error {
+	if !dev.InDevMode() {
+		return dev.ErrNotInDevMode
+	}
+
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
@@ -47,8 +54,8 @@ func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
 		Use:               "remove-propagation-directive",
-		Short:             `Remove propagation directive from gittuf root of trust`,
-		Long:              "The 'remove-propagation-directive' command removes a propagation directive from the repository's root of trust. It is used to delete an existing directive and stop the propagation of content between repositories.",
+		Short:             fmt.Sprintf(`Remove propagation directive from gittuf root of trust (developer mode only, set %s=1)`, dev.DevModeKey),
+		Long:              fmt.Sprintf("The 'remove-propagation-directive' command removes a propagation directive from the repository's root of trust. It is used to delete an existing directive and stop the propagation of content between repositories (developer mode only, set %s=1).", dev.DevModeKey),
 		RunE:              o.Run,
 		DisableAutoGenTag: true,
 	}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/list"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/gittuf/gittuf/internal/logging"
 )
 
 type verifyScreen struct {
@@ -37,7 +38,7 @@ func (s *verifyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 					m.loadingMsg = "Verifying network repositories..."
 
 					pr, pw := io.Pipe()
-					logger := slog.New(slog.NewTextHandler(pw, &slog.HandlerOptions{Level: slog.LevelDebug}))
+					logger := slog.New(logging.NewHandler(pw, slog.LevelDebug))
 					slog.SetDefault(logger)
 
 					scanner := bufio.NewScanner(pr)
@@ -52,7 +53,7 @@ func (s *verifyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 							defer pw.Close()
 							err := m.repo.VerifyNetwork(m.ctx)
 
-							slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelInfo})))
+							slog.SetDefault(slog.New(logging.NewHandler(os.Stderr, slog.LevelInfo)))
 
 							return verifyResultMsg{err: err, successMsg: "Network verification successful!"}
 						},

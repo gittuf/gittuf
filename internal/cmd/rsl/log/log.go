@@ -4,8 +4,6 @@
 package log //nolint:revive
 
 import (
-	"os"
-
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/display"
 	"github.com/spf13/cobra"
@@ -24,13 +22,23 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 	)
 }
 
-func (o *options) Run(_ *cobra.Command, _ []string) error {
+func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	repo, err := gittuf.LoadRepository(".")
 	if err != nil {
 		return err
 	}
 
-	return display.RSLLog(repo.GetStorer(), display.NewDisplayWriter(os.Stdout), display.WithReferences(o.refs))
+	gitRepo := repo.GetGitRepository()
+	refs := make([]string, 0, len(o.refs))
+	for _, ref := range o.refs {
+		absRef, err := gitRepo.AbsoluteReference(ref)
+		if err != nil {
+			return err
+		}
+		refs = append(refs, absRef)
+	}
+
+	return display.RSLLog(repo.GetStorer(), display.NewDisplayWriter(cmd.OutOrStdout()), display.WithReferences(refs))
 }
 
 func New() *cobra.Command {
