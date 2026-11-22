@@ -254,6 +254,10 @@ func applySetupPolicyCmd(ctx context.Context, repo *gittuf.Repository, keyRef, p
 
 // updateSetupWizard handles keyboard interactions when the setup modal is active.
 func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if msg.String() == "ctrl+c" {
+		return m, tea.Quit
+	}
+
 	switch m.setupWizard.step {
 	case wizardStepOverview:
 		switch msg.String() {
@@ -305,11 +309,14 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case wizardStepCustomKeyInput:
 		switch msg.String() {
 		case "esc":
+			m.setupWizard.keyInput.Blur()
 			m.setupWizard.step = wizardStepKey
 			return m, nil
 		case "enter":
 			val := strings.TrimSpace(m.setupWizard.keyInput.Value())
 			if val != "" {
+				m.setupWizard.keyInput.SetValue(val)
+				m.setupWizard.keyInput.Blur()
 				m.setupWizard.selectedKey = val
 				m.setupWizard.step = wizardStepPrincipal
 				m.setupWizard.personInput.Focus()
@@ -325,11 +332,14 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case wizardStepPrincipal:
 		switch msg.String() {
 		case "esc":
+			m.setupWizard.personInput.Blur()
 			m.setupWizard.step = wizardStepKey
 			return m, nil
 		case "enter":
 			val := strings.Join(strings.Fields(m.setupWizard.personInput.Value()), "-")
 			if val != "" {
+				m.setupWizard.personInput.SetValue(val)
+				m.setupWizard.personInput.Blur()
 				m.setupWizard.principalName = val
 				m.setupWizard.step = wizardStepBranch
 				m.setupWizard.branchInput.Focus()
@@ -345,6 +355,7 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case wizardStepBranch:
 		switch msg.String() {
 		case "esc":
+			m.setupWizard.branchInput.Blur()
 			m.setupWizard.step = wizardStepPrincipal
 			m.setupWizard.personInput.Focus()
 			return m, textinput.Blink
@@ -353,6 +364,8 @@ func (m model) updateSetupWizard(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if val == "" {
 				val = "main"
 			}
+			m.setupWizard.branchInput.SetValue(val)
+			m.setupWizard.branchInput.Blur()
 			m.setupWizard.targetBranch = val
 			m.setupWizard.step = wizardStepApplying
 			m.setupWizard.applyingMsg = fmt.Sprintf("Initializing gittuf policy & protecting '%s'...", m.setupWizard.targetBranch)

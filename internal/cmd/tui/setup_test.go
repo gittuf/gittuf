@@ -6,12 +6,16 @@ package tui
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
 	"github.com/gittuf/gittuf/internal/policy"
+	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	tufv02 "github.com/gittuf/gittuf/internal/tuf/v02"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/gittuf/gittuf/pkg/gitstore"
 	"github.com/stretchr/testify/assert"
@@ -292,4 +296,68 @@ func TestRenderSetupWizardDialogTerminalResize(t *testing.T) {
 		setupWizard:     newSetupWizard(nil, "test-key.pub"),
 	}
 	assert.NotEmpty(t, renderSetupWizardDialog(mWide))
+}
+
+func TestApplySetupPolicyCmd(t *testing.T) {
+	t.Run("bootstraps policy with Person principal and branch rule", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+
+		gitRepo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		keyPath := filepath.Join(tmpDir, "test-key")
+		require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+		require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+		emptyTreeID, err := gitRepo.EmptyTree()
+		require.NoError(t, err)
+		_, err = gitRepo.Commit(emptyTreeID, "refs/heads/main", "Initial commit\n", false)
+		require.NoError(t, err)
+
+		repo, err := gittuf.LoadRepository(".")
+		require.NoError(t, err)
+
+		msg := applySetupPolicyCmd(t.Context(), repo, keyPath, "Jane Doe", "refs/heads/main")()
+		doneMsg, ok := msg.(setupDoneMsg)
+		require.True(t, ok)
+		require.NoError(t, doneMsg.err)
+		assert.NotNil(t, doneMsg.signer)
+		assert.Equal(t, keyPath, doneMsg.signingKey)
+
+		hasApplied, err := repo.HasPolicy()
+		require.NoError(t, err)
+		assert.True(t, hasApplied)
+
+		principals, err := repo.ListPrincipals(t.Context(), policy.PolicyRef, policy.TargetsRoleName)
+		require.NoError(t, err)
+		p, exists := principals["Jane-Doe"]
+		require.True(t, exists)
+		person, isPerson := p.(*tufv02.Person)
+		require.True(t, isPerson)
+		assert.Equal(t, "Jane-Doe", person.PersonID)
+		assert.Len(t, person.PublicKeys, 1)
+
+		rules, err := repo.ListRules(t.Context(), policy.PolicyRef)
+		require.NoError(t, err)
+		require.Len(t, rules, 1)
+		assert.Equal(t, "protect-main", rules[0].Delegation.ID())
+		assert.Contains(t, rules[0].Delegation.GetPrincipalIDs().Contents(), "Jane-Doe")
+	})
+
+	t.Run("returns error when principal name is empty", func(t *testing.T) {
+		msg := applySetupPolicyCmd(t.Context(), nil, "test-key", "   ", "main")()
+		doneMsg, ok := msg.(setupDoneMsg)
+		require.True(t, ok)
+		require.ErrorContains(t, doneMsg.err, "no principal name specified")
+	})
+}
+
+func TestUpdateSetupWizardCtrlCQuit(t *testing.T) {
+	m := model{
+		ctx:             context.Background(),
+		showSetupWizard: true,
+		setupWizard:     newSetupWizard(nil, "test-key.pub"),
+	}
+	m.setupWizard.step = wizardStepPrincipal
+	_, quitCmd := m.updateSetupWizard(tea.KeyMsg{Type: tea.KeyCtrlC})
+	assert.NotNil(t, quitCmd)
 }
