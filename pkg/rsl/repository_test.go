@@ -1831,6 +1831,59 @@ func TestSkipAllInvalidReferenceEntriesForRef(t *testing.T) {
 
 		assert.Equal(t, originalLatestEntry, newLatestEntry)
 	})
+
+	t.Run("skip entries when interspersed with another ref", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		treeBuilder := gitinterface.NewTreeBuilder(repo)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		require.Nil(t, err)
+
+		// 1. Commit F1 on feature
+		f1Hash, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature 1\n", false)
+		require.Nil(t, err)
+		require.NoError(t, NewReferenceEntry("refs/heads/feature", f1Hash).Commit(repo, false))
+		f1Entry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		// 2. Commit M1 on main (interspersed between feature entries)
+		m1Hash, err := repo.Commit(emptyTreeHash, "refs/heads/main", "Main 1\n", false)
+		require.Nil(t, err)
+		require.NoError(t, NewReferenceEntry("refs/heads/main", m1Hash).Commit(repo, false))
+		mainEntry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		// 3. Commit F2 on feature (parent in RSL is mainEntry M1)
+		f2Hash, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature 2\n", false)
+		require.Nil(t, err)
+		require.NoError(t, NewReferenceEntry("refs/heads/feature", f2Hash).Commit(repo, false))
+		f2Entry, err := GetLatestEntry(repo)
+		require.Nil(t, err)
+
+		// 4. Feature history rewritten: create F3 that is not a descendant of F1 or F2
+		require.NoError(t, repo.SetReference("refs/heads/feature", gitinterface.ZeroHash))
+		f3Hash, err := repo.Commit(emptyTreeHash, "refs/heads/feature", "Feature 3 (rewritten)\n", false)
+		require.Nil(t, err)
+		require.NoError(t, NewReferenceEntry("refs/heads/feature", f3Hash).Commit(repo, false))
+
+		// Run SkipAllInvalidReferenceEntriesForRef for feature branch
+		err = SkipAllInvalidReferenceEntriesForRef(repo, "refs/heads/feature", false)
+		require.NoError(t, err)
+
+		latestEntry, err := GetLatestEntry(repo)
+		require.NoError(t, err)
+		annotationEntry, isAnnotation := latestEntry.(*AnnotationEntry)
+		require.True(t, isAnnotation)
+
+		// mainEntry MUST NOT be skipped!
+		for _, skippedID := range annotationEntry.RSLEntryIDs {
+			assert.NotEqual(t, mainEntry.GetID(), skippedID, "main branch entry was erroneously skipped!")
+		}
+
+		// Both invalid feature entries (F2 and F1) MUST be skipped
+		assert.ElementsMatch(t, []githash.Hash{f1Entry.GetID(), f2Entry.GetID()}, annotationEntry.RSLEntryIDs)
+	})
 }
 
 func TestGetFirstReferenceUpdaterEntryForCommit(t *testing.T) {

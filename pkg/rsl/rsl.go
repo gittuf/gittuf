@@ -971,13 +971,14 @@ func SkipAllInvalidReferenceEntriesForRef(storer gitstore.Storer, targetRef stri
 				break
 			}
 		}
-		iterator, err = GetParentForEntry(storer, iterator)
+		nextEntry, _, err := GetLatestReferenceUpdaterEntry(storer, ForReference(targetRef), BeforeEntryID(iterator.GetID()))
 		if err != nil {
 			if errors.Is(err, ErrRSLEntryNotFound) {
 				break
 			}
 			return err
 		}
+		iterator = nextEntry
 	}
 
 	if len(entriesToSkip) == 0 {
