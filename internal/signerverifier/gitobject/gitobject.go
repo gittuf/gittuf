@@ -214,7 +214,7 @@ func verifyGitsignSignature(ctx context.Context, key *signerverifier.SSLibKey, d
 
 	summary, err := gitsignVerifier.Verify(ctx, verifier, rekor, data, signature, true)
 	if err != nil {
-		return ErrIncorrectVerificationKey
+		return errors.Join(ErrIncorrectVerificationKey, err)
 	}
 
 	checkOpts.RekorClient = rekor.Rekor
