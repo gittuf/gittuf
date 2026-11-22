@@ -97,8 +97,15 @@ func (r *Repository) ApplyPolicy(ctx context.Context, remoteName string, localOn
 	return err
 }
 
-func (r *Repository) DiscardPolicy() error {
-	return policy.Discard(r.r)
+func (r *Repository) DiscardPolicy(signCommit bool) error {
+	if signCommit {
+		slog.Debug("Checking if Git signing is configured...")
+		if err := r.r.CanSign(); err != nil {
+			return err
+		}
+	}
+
+	return policy.Discard(r.r, signCommit)
 }
 
 type DelegationWithDepth struct {
