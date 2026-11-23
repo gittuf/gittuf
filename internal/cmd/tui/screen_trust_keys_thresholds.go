@@ -366,6 +366,9 @@ func (s *trustKeysThresholdsScreen) renderTrustKeys() string {
 			fmt.Fprintf(&b, "Top-Level Policy Keys (threshold: %d)\n", s.keys.policyThreshold)
 		}
 		writeTrustKeyPrincipals(&b, s.keys.policyKeys)
+
+		b.WriteString("\nTop-Level Policy Principal Keys\n")
+		writePolicyFilePrincipals(&b, s.keys.policyPrincipals)
 	}
 
 	return strings.TrimSpace(b.String())

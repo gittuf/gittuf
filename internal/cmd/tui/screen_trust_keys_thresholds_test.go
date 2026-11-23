@@ -13,7 +13,9 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	"github.com/gittuf/gittuf/internal/cmd/policy/persistent"
+	"github.com/gittuf/gittuf/internal/policy"
 	artifacts "github.com/gittuf/gittuf/internal/testartifacts"
+	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,7 +98,7 @@ func TestTrustKeysListKeys(t *testing.T) {
 
 		signer, err := gittuf.LoadSigner(repo, keyPath)
 		require.NoError(t, err)
-		policyKey, err := gittuf.LoadPublicKey(keyPath + ".pub")
+		policyKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
 		require.NoError(t, err)
 		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, policyKey, false))
 		require.NoError(t, repo.StagePolicy(t.Context(), "", true, false))
@@ -119,6 +121,91 @@ func TestTrustKeysListKeys(t *testing.T) {
 		assert.Contains(t, viewStr, "Top-Level Policy Keys (threshold: 1)")
 		assert.Equal(t, 1, strings.Count(viewStr, policyKey.ID()))
 		assert.NotContains(t, viewStr, "Root Keys")
+	})
+
+	t.Run("lists all unstaged policy keys with policy-staging target ref", func(t *testing.T) {
+		keyPath, repo := setup(t)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+
+		firstKeyPath := filepath.Join(t.TempDir(), "first.pub")
+		require.NoError(t, os.WriteFile(firstKeyPath, artifacts.SSHECDSAPublicSSH, 0o600))
+		firstKey, err := gittuf.LoadPublicKey(repo, firstKeyPath)
+		require.NoError(t, err)
+
+		secondKeyPath := filepath.Join(t.TempDir(), "second.pub")
+		require.NoError(t, os.WriteFile(secondKeyPath, artifacts.SSHRSAPublicSSH, 0o600))
+		secondKey, err := gittuf.LoadPublicKey(repo, secondKeyPath)
+		require.NoError(t, err)
+
+		// Add keys the way the TUI does, without staging or applying
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, firstKey, false))
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, secondKey, false))
+
+		m := newTestModel(keyPath)
+		m.options.targetRef = "policy-staging"
+		s := &m.trustKeysScreen
+
+		selectItemByTitle(t, &s.operationList, "List Policy Keys")
+		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		require.Nil(t, resModel.errorDialog)
+		require.NotNil(t, resModel.trustKeysScreen.keys)
+		require.Len(t, resModel.trustKeysScreen.keys.policyKeys, 2)
+
+		viewStr := resModel.trustKeysScreen.View(&resModel)
+		assert.Contains(t, viewStr, "Top-Level Policy Keys (threshold: 1)")
+		assert.Contains(t, viewStr, firstKey.ID())
+		assert.Contains(t, viewStr, secondKey.ID())
+		assert.NotContains(t, viewStr, "threshold: not configured")
+	})
+
+	t.Run("lists principal keys from the top-level policy", func(t *testing.T) {
+		keyPath, repo := setup(t)
+
+		signer, err := gittuf.LoadSigner(repo, keyPath)
+		require.NoError(t, err)
+		policyKey, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
+		require.NoError(t, err)
+		require.NoError(t, repo.AddTopLevelTargetsKey(t.Context(), signer, policyKey, false))
+		require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
+
+		firstKeyPath := filepath.Join(t.TempDir(), "first.pub")
+		require.NoError(t, os.WriteFile(firstKeyPath, artifacts.SSHECDSAPublicSSH, 0o600))
+		firstKey, err := gittuf.LoadPublicKey(repo, firstKeyPath)
+		require.NoError(t, err)
+
+		secondKeyPath := filepath.Join(t.TempDir(), "second.pub")
+		require.NoError(t, os.WriteFile(secondKeyPath, artifacts.SSHRSAPublicSSH, 0o600))
+		secondKey, err := gittuf.LoadPublicKey(repo, secondKeyPath)
+		require.NoError(t, err)
+
+		require.NoError(t, repo.AddPrincipalToTargets(t.Context(), signer, policy.TargetsRoleName, []tuf.Principal{firstKey, secondKey}, false))
+		require.NoError(t, repo.StagePolicy(t.Context(), "", true, false))
+		require.NoError(t, repo.ApplyPolicy(t.Context(), "", true, false))
+
+		m := newTestModel(keyPath)
+		s := &m.trustKeysScreen
+
+		selectItemByTitle(t, &s.operationList, "List Policy Keys")
+		updatedModel, _ := s.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		require.Nil(t, resModel.errorDialog)
+		require.NotNil(t, resModel.trustKeysScreen.keys)
+		require.Len(t, resModel.trustKeysScreen.keys.policyKeys, 1)
+		require.Len(t, resModel.trustKeysScreen.keys.policyPrincipals, 2)
+
+		viewStr := resModel.trustKeysScreen.View(&resModel)
+		assert.Contains(t, viewStr, "Top-Level Policy Keys (threshold: 1)")
+		assert.Contains(t, viewStr, policyKey.ID())
+		assert.Contains(t, viewStr, "Top-Level Policy Principal Keys")
+		// Each principal is listed once, followed by its key
+		assert.Equal(t, 2, strings.Count(viewStr, firstKey.ID()))
+		assert.Equal(t, 2, strings.Count(viewStr, secondKey.ID()))
+		assert.NotContains(t, viewStr, "None configured.")
 	})
 
 	t.Run("esc closes key list before leaving screen", func(t *testing.T) {

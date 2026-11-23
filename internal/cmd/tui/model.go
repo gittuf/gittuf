@@ -194,7 +194,7 @@ func trustKeysMenuItems(readOnly bool) []list.Item {
 	}
 	return []list.Item{
 		item{title: "List Root Keys", desc: "Show trusted root keys and their signature threshold"},
-		item{title: "List Policy Keys", desc: "Show trusted top-level policy keys and their signature threshold"},
+		item{title: "List Policy Keys", desc: "Show trusted top-level policy keys and their signature threshold, plus principal keys"},
 		item{title: "Add Root Key", desc: "Add a trusted root key"},
 		item{title: "Remove Root Key", desc: "Remove a trusted root key"},
 		item{title: "Add Policy Key", desc: "Add a trusted policy key"},
