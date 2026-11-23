@@ -13,9 +13,12 @@ import (
 )
 
 type options struct {
-	latestOnly    bool
-	fromEntry     string
-	remoteRefName string
+	latestOnly       bool
+	fromEntry        string
+	remoteRefName    string
+	granularVSAsPath string
+	metaVSAPath      string
+	slsaSigner       string
 }
 
 func (o *options) AddFlags(cmd *cobra.Command) {
@@ -41,6 +44,27 @@ func (o *options) AddFlags(cmd *cobra.Command) {
 		"",
 		"name of remote reference, if it differs from the local name",
 	)
+
+	cmd.Flags().StringVar(
+		&o.granularVSAsPath,
+		"write-granular-verification-summaries",
+		"",
+		"path to write granular verification summary attestations (one per policy) as an in-toto attestation bundle",
+	)
+
+	cmd.Flags().StringVar(
+		&o.metaVSAPath,
+		"write-overall-verification-summary",
+		"",
+		"path to write a single verification summary attestation",
+	)
+
+	cmd.Flags().StringVar(
+		&o.slsaSigner,
+		"sign-verification-summary",
+		"",
+		"signing key or identity for one or more verification summaries",
+	)
 }
 
 func (o *options) Run(cmd *cobra.Command, args []string) error {
@@ -49,18 +73,35 @@ func (o *options) Run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
+	if o.latestOnly {
+		opts = append(opts, verifyopts.WithLatestOnly())
+	}
+
+	if o.granularVSAsPath != "" {
+		opts = append(opts, verifyopts.WithGranularVSAsPath(o.granularVSAsPath))
+	}
+	if o.metaVSAPath != "" {
+		opts = append(opts, verifyopts.WithMetaVSAPath(o.metaVSAPath))
+	}
+
+	if o.slsaSigner != "" {
+		signer, err := gittuf.LoadSigner(repo, o.slsaSigner)
+		if err != nil {
+			return err
+		}
+
+		opts = append(opts, verifyopts.WithVSASigner(signer))
+	}
+
 	if o.fromEntry != "" {
 		if !dev.InDevMode() {
 			return dev.ErrNotInDevMode
 		}
 
-		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, verifyopts.WithOverrideRefName(o.remoteRefName))
+		return repo.VerifyRefFromEntry(cmd.Context(), args[0], o.fromEntry, opts...)
 	}
 
-	opts := []verifyopts.Option{verifyopts.WithOverrideRefName(o.remoteRefName)}
-	if o.latestOnly {
-		opts = append(opts, verifyopts.WithLatestOnly())
-	}
 	return repo.VerifyRef(cmd.Context(), args[0], opts...)
 }
 
