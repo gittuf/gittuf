@@ -1,6 +1,11 @@
 // Copyright The gittuf Authors
 // SPDX-License-Identifier: Apache-2.0
 
+// Package tui implements the terminal user interface started by `gittuf tui`,
+// built on Bubble Tea. It lets users inspect and edit gittuf policy and trust
+// metadata interactively. Write operations need a signing key; without one the
+// TUI runs in read-only mode. Changes are staged immediately and take effect
+// only after `gittuf policy apply` is run.
 package tui
 
 import (
@@ -46,6 +51,7 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 	return startTUI(cmd.Context(), o)
 }
 
+// New returns the cobra command for `gittuf tui`.
 func New(persistent *persistent.Options) *cobra.Command {
 	o := &options{p: persistent}
 	cmd := &cobra.Command{
