@@ -70,11 +70,6 @@ func TestClone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	currentDir, err := os.Getwd()
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	keysDir := t.TempDir()
 	rootPubKeyPath := filepath.Join(keysDir, "root.pub")
 	if err := os.WriteFile(rootPubKeyPath, rootPubKeyBytes, 0o600); err != nil {
@@ -88,11 +83,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", "", nil, true)
 		assert.Nil(t, err)
@@ -112,11 +103,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone with dir, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		dirName := "myRepo"
 		repo, err := Clone(testCtx, remoteTmpDir, dirName, "", nil, true)
@@ -141,11 +128,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", anotherRefName, nil, true)
 		assert.Nil(t, err)
@@ -166,11 +149,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone when unspecified dir already exists, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		_, err = Clone(testCtx, remoteTmpDir, "", "", nil, true)
 		assert.Nil(t, err)
@@ -181,11 +160,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone when specified dir already exists, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		dirName := "myRepo"
 		if err := os.Mkdir(dirName, 0o755); err != nil {
@@ -197,11 +172,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with trailing slashes in repository path, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir+"//", "", "", nil, true)
 		assert.Nil(t, err)
@@ -221,11 +192,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with multiple expected root keys, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", "", []string{targetsPubKeyPath, rootPubKeyPath}, true)
 		assert.Nil(t, err)
@@ -242,11 +209,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone without specifying dir, with expected root keys not equaling root keys, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
 
@@ -256,11 +219,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone with error loading expected root keys, bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		// Point gpg.program at a program that doesn't exist
 		configPath := filepath.Join(t.TempDir(), "gitconfig")
@@ -281,11 +240,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", "", nil, false)
 		assert.Nil(t, err)
@@ -305,11 +260,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone with dir, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		dirName := "myRepo"
 		repo, err := Clone(testCtx, remoteTmpDir, dirName, "", nil, false)
@@ -334,11 +285,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with non-HEAD initial branch, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", anotherRefName, nil, false)
 		assert.Nil(t, err)
@@ -359,11 +306,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone when unspecified dir already exists, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		_, err = Clone(testCtx, remoteTmpDir, "", "", nil, false)
 		assert.Nil(t, err)
@@ -374,11 +317,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone when specified dir already exists, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		dirName := "myRepo"
 		if err := os.Mkdir(dirName, 0o755); err != nil {
@@ -390,11 +329,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with trailing slashes in repository path, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir+"//", "", "", nil, false)
 		assert.Nil(t, err)
@@ -414,11 +349,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("successful clone without specifying dir, with multiple expected root keys, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		repo, err := Clone(testCtx, remoteTmpDir, "", "", []string{targetsPubKeyPath, rootPubKeyPath}, false)
 		assert.Nil(t, err)
@@ -435,11 +366,7 @@ func TestClone(t *testing.T) {
 
 	t.Run("unsuccessful clone without specifying dir, with expected root keys not equaling root keys, not bare", func(t *testing.T) {
 		localTmpDir := t.TempDir()
-
-		if err := os.Chdir(localTmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(currentDir) //nolint:errcheck
+		t.Chdir(localTmpDir)
 
 		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
 

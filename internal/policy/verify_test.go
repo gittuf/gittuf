@@ -779,14 +779,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(featureRefName, commitIDs[0])
@@ -842,14 +835,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(featureRefName, commitIDs[0])
@@ -928,14 +914,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(featureRefName, commitIDs[0])
@@ -991,14 +970,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		entry := rsl.NewReferenceEntry(featureRefName, commitIDs[0])
@@ -1055,14 +1027,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1133,14 +1098,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1234,14 +1192,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1312,14 +1263,7 @@ func TestVerifyMergeable(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1426,14 +1370,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
@@ -1487,14 +1424,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
@@ -1571,14 +1501,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
@@ -1632,14 +1555,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		commitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, featureRefName, 1, gpgKeyBytes)
 		featureID := commitIDs[0]
@@ -1694,14 +1610,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1770,14 +1679,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1869,14 +1771,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -1945,14 +1840,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])
@@ -2024,14 +1912,7 @@ func TestVerifyMergeableForCommit(t *testing.T) {
 		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(filepath.Join(repo.GetGitDir(), "..")); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(filepath.Join(repo.GetGitDir(), ".."))
 
 		baseCommitIDs := common.AddNTestCommitsToSpecifiedRef(t, repo, refName, 2, gpgKeyBytes)
 		baseEntry := rsl.NewReferenceEntry(refName, baseCommitIDs[1])

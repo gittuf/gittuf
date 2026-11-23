@@ -6,7 +6,6 @@ package gitinterface
 import (
 	"bytes"
 	"fmt"
-	"os"
 	"testing"
 
 	"github.com/gittuf/gittuf/pkg/gitstore"
@@ -324,17 +323,10 @@ func TestGetMergeTree(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
-		// We meed to change the directory for this test because we `checkout`
+		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		emptyBlobID, err := repo.WriteBlob(nil)
 		if err != nil {
@@ -409,17 +401,10 @@ func TestGetMergeTree(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
-		// We meed to change the directory for this test because we `checkout`
+		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		emptyBlobID, err := repo.WriteBlob(nil)
 		if err != nil {
@@ -491,17 +476,10 @@ func TestGetMergeTree(t *testing.T) {
 		tmpDir := t.TempDir()
 		repo := CreateTestGitRepository(t, tmpDir, false)
 
-		// We meed to change the directory for this test because we `checkout`
+		// We need to change the directory for this test because we `checkout`
 		// for older Git versions, modifying the worktree. This chdir ensures
 		// that the temporary directory is used as the worktree.
-		pwd, err := os.Getwd()
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := os.Chdir(tmpDir); err != nil {
-			t.Fatal(err)
-		}
-		defer os.Chdir(pwd) //nolint:errcheck
+		t.Chdir(tmpDir)
 
 		emptyBlobID, err := repo.WriteBlob(nil)
 		if err != nil {
