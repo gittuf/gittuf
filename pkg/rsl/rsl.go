@@ -298,6 +298,10 @@ func (a *AnnotationEntry) GetID() githash.Hash {
 // is 0 (unset), the current entry's number is set to 1. The numbering starts
 // from 1 as 0 is used to signal the lack of numbering.
 func (a *AnnotationEntry) Commit(storer gitstore.Storer, sign bool) error {
+	if len(a.RSLEntryIDs) == 0 {
+		return fmt.Errorf("%w: annotation must refer to at least one entry", ErrInvalidRSLEntry)
+	}
+
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
 		if _, err := GetEntry(storer, id); err != nil {
@@ -326,6 +330,10 @@ func (a *AnnotationEntry) Commit(storer gitstore.Storer, sign bool) error {
 // the parent entry's number is 0 (unset), the current entry's number is set to
 // 1. The numbering starts from 1 as 0 is used to signal the lack of numbering.
 func (a *AnnotationEntry) CommitUsingSpecificKey(storer gitstore.Storer, signingKeyBytes []byte) error {
+	if len(a.RSLEntryIDs) == 0 {
+		return fmt.Errorf("%w: annotation must refer to at least one entry", ErrInvalidRSLEntry)
+	}
+
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
 		if _, err := GetEntry(storer, id); err != nil {
@@ -427,6 +435,10 @@ func (a *AnnotationEntry) createCommitMessage(includeNumber bool) (string, error
 // producing a legacy unnumbered entry. It exists to exercise the RSL's support
 // for repositories that transition from unnumbered to numbered entries.
 func (a *AnnotationEntry) CommitWithoutNumber(storer gitstore.Storer) error {
+	if len(a.RSLEntryIDs) == 0 {
+		return fmt.Errorf("%w: annotation must refer to at least one entry", ErrInvalidRSLEntry)
+	}
+
 	// Check if referred entries exist in the RSL namespace.
 	for _, id := range a.RSLEntryIDs {
 		if _, err := GetEntry(storer, id); err != nil {

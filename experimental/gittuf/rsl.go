@@ -190,6 +190,10 @@ func (r *Repository) SkipAllInvalidReferenceEntriesForRef(targetRef string, sign
 // RecordRSLAnnotation is the interface for the user to add an RSL annotation
 // for one or more prior RSL entries.
 func (r *Repository) RecordRSLAnnotation(ctx context.Context, rslEntryIDs []string, skip bool, message string, signCommit bool, opts ...rslopts.AnnotateOption) error {
+	if len(rslEntryIDs) == 0 {
+		return fmt.Errorf("%w: annotation must refer to at least one entry", rsl.ErrInvalidRSLEntry)
+	}
+
 	options := &rslopts.AnnotateOptions{}
 	for _, fn := range opts {
 		fn(options)

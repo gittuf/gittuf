@@ -2351,10 +2351,14 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		t.Parallel()
 
 		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		require.NoError(t, NewReferenceEntry("refs/heads/annotation-get-ref-error", gitinterface.ZeroHash).Commit(repo, false))
+		entryID, err := repo.GetReference(Ref)
+		require.NoError(t, err)
+
 		injected := errors.New("get reference failure")
 		storer := &gitstoretest.FakeStorer{Storer: repo, GetReferenceErr: injected}
 
-		err := NewAnnotationEntry(nil, false, annotationMessage).Commit(storer, false)
+		err = NewAnnotationEntry([]githash.Hash{entryID}, false, annotationMessage).Commit(storer, false)
 		assert.ErrorIs(t, err, injected)
 	})
 
@@ -2362,11 +2366,33 @@ func TestAnnotationEntryCommitStorerErrors(t *testing.T) {
 		t.Parallel()
 
 		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+		require.NoError(t, NewReferenceEntry("refs/heads/annotation-get-ref-error-key", gitinterface.ZeroHash).Commit(repo, false))
+		entryID, err := repo.GetReference(Ref)
+		require.NoError(t, err)
+
 		injected := errors.New("get reference failure")
 		storer := &gitstoretest.FakeStorer{Storer: repo, GetReferenceErr: injected}
 
-		err := NewAnnotationEntry(nil, false, annotationMessage).CommitUsingSpecificKey(storer, artifacts.SSHED25519Private)
+		err = NewAnnotationEntry([]githash.Hash{entryID}, false, annotationMessage).CommitUsingSpecificKey(storer, artifacts.SSHED25519Private)
 		assert.ErrorIs(t, err, injected)
+	})
+
+	t.Run("empty entry IDs error", func(t *testing.T) {
+		t.Parallel()
+
+		repo := gitinterface.CreateTestGitRepository(t, t.TempDir(), false)
+
+		err := NewAnnotationEntry(nil, false, annotationMessage).Commit(repo, false)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+
+		err = NewAnnotationEntry([]githash.Hash{}, false, annotationMessage).Commit(repo, false)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+
+		err = NewAnnotationEntry(nil, false, annotationMessage).CommitUsingSpecificKey(repo, artifacts.SSHED25519Private)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
+
+		err = NewAnnotationEntry(nil, false, annotationMessage).CommitWithoutNumber(repo)
+		assert.ErrorIs(t, err, ErrInvalidRSLEntry)
 	})
 
 	t.Run("referenced entry lookup error", func(t *testing.T) {
