@@ -76,7 +76,12 @@ func (s *trustPropagationScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustPropagation:
 		if s.showDirectives {
-			return m.renderScreen("Home › Trust › Propagation", s.renderDirectives(), renderActionHints(m.readOnly))
+			hints := "\n" + renderStyledHelp([][2]string{
+				{"esc", "back to menu"},
+				{"h", "help"},
+				{"q", "quit"},
+			})
+			return m.renderScreen("Home › Trust › Propagation › Directives", s.renderDirectives(), hints)
 		}
 		return m.renderScreen("Home › Trust › Propagation", s.operationList.View(), renderActionHints(m.readOnly))
 	case screenTrustAddPropagationForm:
