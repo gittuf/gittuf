@@ -237,7 +237,12 @@ func (m model) updateInternal(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case screenTrustLifecycle, screenTrustGitHubApp, screenTrustRepoNetwork:
 				m.screen = screenTrust
 			case screenTrustPropagation:
-				m.screen = screenTrust
+				if m.trustPropagationScreen.showDirectives {
+					m.trustPropagationScreen.showDirectives = false
+					m.trustPropagationScreen.directives = nil
+				} else {
+					m.screen = screenTrust
+				}
 			case screenVerifyRefForm, screenVerifyMergeableForm:
 				m.screen = screenVerify
 			}
