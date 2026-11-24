@@ -42,6 +42,7 @@ func TestPolicyPrincipalsFormSubmit(t *testing.T) {
 			options: &options{
 				p:          &persistent.Options{SigningKey: keyPath},
 				policyName: policy.TargetsRoleName,
+				targetRef:  "policy",
 			},
 			policyPrincipalsScreen: policyPrincipalsScreen{
 				list: newMenuList("Policy Principals", []list.Item{}, newDelegate(4)),
@@ -91,6 +92,7 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 			options: &options{
 				p:          &persistent.Options{SigningKey: keyPath},
 				policyName: policy.TargetsRoleName,
+				targetRef:  "policy",
 			},
 			policyPrincipalsScreen: policyPrincipalsScreen{
 				list: newMenuList("Policy Principals", []list.Item{}, newDelegate(4)),
@@ -184,4 +186,57 @@ func TestPolicyPrincipalsFormEditPerson(t *testing.T) {
 		keyIDs := submitEdit(t, m, repo, person, key.KeyID+", "+otherKeyPath)
 		assert.ElementsMatch(t, []string{key.KeyID, otherKey.KeyID}, keyIDs)
 	})
+}
+
+func TestGetCurrPrincipalsHonorsTargetRef(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Chdir(tmpDir)
+
+	gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+	keyPath := filepath.Join(tmpDir, "test-key")
+	require.NoError(t, os.WriteFile(keyPath, artifacts.SSHED25519Private, 0o600))
+	require.NoError(t, os.WriteFile(keyPath+".pub", artifacts.SSHED25519PublicSSH, 0o600))
+
+	repo, err := gittuf.LoadRepository(".")
+	require.NoError(t, err)
+	signer, err := gittuf.LoadSigner(repo, keyPath)
+	require.NoError(t, err)
+	require.NoError(t, repo.InitializeRoot(t.Context(), signer, false))
+	require.NoError(t, repo.InitializeTargets(t.Context(), signer, policy.TargetsRoleName, false))
+
+	key, err := gittuf.LoadPublicKey(repo, keyPath+".pub")
+	require.NoError(t, err)
+	pubKey := key.(*tufv02.Key)
+
+	person := &tufv02.Person{
+		PersonID:   "jane.doe@example.com",
+		PublicKeys: map[string]*tufv02.Key{pubKey.KeyID: pubKey},
+	}
+
+	stagingOpts := &options{
+		p:          &persistent.Options{SigningKey: keyPath},
+		policyName: policy.TargetsRoleName,
+		targetRef:  policy.PolicyStagingRef,
+	}
+	require.NoError(t, repoAddPrincipal(t.Context(), stagingOpts, person))
+
+	stagedPrincipals := getCurrPrincipals(t.Context(), stagingOpts)
+	stagedIDs := make([]string, 0, len(stagedPrincipals))
+	for _, p := range stagedPrincipals {
+		stagedIDs = append(stagedIDs, p.ID())
+	}
+	assert.Contains(t, stagedIDs, person.PersonID)
+
+	policyOpts := &options{
+		p:          &persistent.Options{SigningKey: keyPath},
+		policyName: policy.TargetsRoleName,
+		targetRef:  "policy",
+	}
+	policyPrincipals := getCurrPrincipals(t.Context(), policyOpts)
+	policyIDs := make([]string, 0, len(policyPrincipals))
+	for _, p := range policyPrincipals {
+		policyIDs = append(policyIDs, p.ID())
+	}
+	assert.NotContains(t, policyIDs, person.PersonID)
 }
