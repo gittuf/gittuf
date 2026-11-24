@@ -29,6 +29,8 @@ type verifyRefScreen struct {
 func (s *verifyRefScreen) reset() {
 	s.form = newFormComponent([]inputField{
 		{"Target Reference (e.g. refs/heads/main)", "Target Ref: "},
+		{"Remote Reference Name (optional, if it differs from the local name)", "Remote Ref Name: "},
+		{"[y/n], default n", "Latest Only: "},
 	})
 }
 
@@ -50,7 +52,7 @@ func (s *verifyRefScreen) View(m *model) string {
 	var b strings.Builder
 	b.WriteString("Verify a specific reference against gittuf policies\n\n")
 	b.WriteString(s.form.View())
-	b.WriteString("\n\nPress Enter to submit.")
+	b.WriteString("\n\nPress Tab to advance, Enter to submit.")
 	return m.renderScreen("Home › Verify › Verify Reference", b.String(), renderActionHints(m.readOnly))
 }
 
@@ -60,6 +62,9 @@ func (s *verifyRefScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 		m.errorMsg = "Target reference is required"
 		return *m, nil
 	}
+
+	remoteRefName := strings.TrimSpace(s.form.inputs[1].Value())
+	latestOnly := strings.ToLower(strings.TrimSpace(s.form.inputs[2].Value())) == "y"
 
 	m.verifying = true
 	m.logsBuf.Reset()
@@ -81,8 +86,7 @@ func (s *verifyRefScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 		func() tea.Msg {
 			defer pw.Close()
 
-			opts := []verifyopts.Option{}
-			err := m.repo.VerifyRef(m.ctx, targetRef, opts...)
+			err := m.repo.VerifyRef(m.ctx, targetRef, buildVerifyRefOptions(remoteRefName, latestOnly)...)
 
 			// Reset logger
 			slog.SetDefault(slog.New(logging.NewHandler(os.Stderr, slog.LevelInfo)))
@@ -91,6 +95,17 @@ func (s *verifyRefScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 			return verifyResultMsg{err: err, successMsg: successMsg}
 		},
 	)
+}
+
+func buildVerifyRefOptions(remoteRefName string, latestOnly bool) []verifyopts.Option {
+	opts := []verifyopts.Option{}
+	if remoteRefName != "" {
+		opts = append(opts, verifyopts.WithOverrideRefName(remoteRefName))
+	}
+	if latestOnly {
+		opts = append(opts, verifyopts.WithLatestOnly())
+	}
+	return opts
 }
 
 //
@@ -105,6 +120,7 @@ func (s *verifyMergeableScreen) reset() {
 	s.form = newFormComponent([]inputField{
 		{"Feature Branch (e.g. refs/heads/feature)", "Feature Branch: "},
 		{"Base Branch (e.g. refs/heads/main)", "Base Branch: "},
+		{"[y/n], default n", "Bypass RSL: "},
 	})
 }
 
@@ -139,6 +155,8 @@ func (s *verifyMergeableScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 		return *m, nil
 	}
 
+	bypassRSL := strings.ToLower(strings.TrimSpace(s.form.inputs[2].Value())) == "y"
+
 	m.verifying = true
 	m.logsBuf.Reset()
 	m.logViewport.SetContent("")
@@ -159,6 +177,9 @@ func (s *verifyMergeableScreen) handleSubmit(m *model) (tea.Model, tea.Cmd) {
 		func() tea.Msg {
 			defer pw.Close()
 			opts := []verifymergeableopts.Option{}
+			if bypassRSL {
+				opts = append(opts, verifymergeableopts.WithBypassRSLForFeatureRef())
+			}
 			needRSLSignature, err := m.repo.VerifyMergeable(m.ctx, baseBranch, featureBranch, opts...)
 
 			// Reset logger
