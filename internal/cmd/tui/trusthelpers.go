@@ -290,7 +290,7 @@ func repoStageTrustChanges(ctx context.Context, _ *options) error {
 		return err
 	}
 
-	return repo.StagePolicy(ctx, "", false, true)
+	return repo.StagePolicy(ctx, "", true, true)
 }
 
 // repoSignTrustChanges signs trust changes to the repository
@@ -319,7 +319,7 @@ func repoApplyTrustChanges(ctx context.Context, _ *options) error {
 		return err
 	}
 
-	return repo.ApplyPolicy(ctx, "", false, true)
+	return repo.ApplyPolicy(ctx, "", true, true)
 }
 
 // repoListPropagationDirectives returns propagation directives for the TUI.
