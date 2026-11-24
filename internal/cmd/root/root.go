@@ -155,7 +155,26 @@ func New() *cobra.Command {
 	cmd.AddCommand(version.New())
 	cmd.AddCommand(tui.New(&persistent.Options{}))
 
+	rejectUnknownSubcommands(cmd)
+
 	return cmd
+}
+
+// rejectUnknownSubcommands makes the commands that only group other commands,
+// like "gittuf policy", return an error for an unknown subcommand. Cobra only
+// checks this on the root command, so "gittuf policy aplly" would otherwise
+// print the help text and exit 0.
+func rejectUnknownSubcommands(cmd *cobra.Command) {
+	for _, subcommand := range cmd.Commands() {
+		if subcommand.HasSubCommands() && !subcommand.Runnable() {
+			subcommand.Args = cobra.NoArgs
+			subcommand.RunE = func(cmd *cobra.Command, _ []string) error {
+				return cmd.Help()
+			}
+		}
+
+		rejectUnknownSubcommands(subcommand)
+	}
 }
 
 // selectStorerBackend reads the backend from the environment. There is no

@@ -5,10 +5,13 @@ package root
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/dev"
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -82,4 +85,52 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("no-color"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("verbose"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("profile"))
+}
+
+func TestUnknownSubcommand(t *testing.T) {
+	tests := map[string]struct {
+		args        []string
+		expectedErr string
+	}{
+		"top level": {
+			args:        []string{"aplly"},
+			expectedErr: `unknown command "aplly" for "gittuf"`,
+		},
+		"policy": {
+			args:        []string{"policy", "aplly"},
+			expectedErr: `unknown command "aplly" for "gittuf policy"`,
+		},
+		"nested": {
+			args:        []string{"rsl", "remote", "chek"},
+			expectedErr: `unknown command "chek" for "gittuf rsl remote"`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, _, _, err := cmd.ExecuteCommandC(New(), test.args...)
+			assert.ErrorContains(t, err, test.expectedErr)
+		})
+	}
+
+	t.Run("no subcommand prints help", func(t *testing.T) {
+		_, stdOut, _, err := cmd.ExecuteCommandC(New(), "policy")
+		assert.NoError(t, err)
+		assert.Contains(t, stdOut.String(), "gittuf policy [command]")
+	})
+
+	t.Run("every command with subcommands", func(t *testing.T) {
+		var check func(c *cobra.Command)
+		check = func(c *cobra.Command) {
+			for _, subcommand := range c.Commands() {
+				if subcommand.HasSubCommands() {
+					args := append(strings.Fields(strings.TrimPrefix(subcommand.CommandPath(), "gittuf")), "nosuch")
+					_, _, _, err := cmd.ExecuteCommandC(New(), args...)
+					assert.ErrorContains(t, err, `unknown command "nosuch"`, subcommand.CommandPath())
+				}
+				check(subcommand)
+			}
+		}
+		check(New())
+	})
 }

@@ -6,6 +6,10 @@ Tools for managing remote policies
 
 The 'remote' subcommand provides tools for pulling and pushing gittuf policy to and from remote repositories.
 
+```
+gittuf policy remote [flags]
+```
+
 ### Options
 
 ```

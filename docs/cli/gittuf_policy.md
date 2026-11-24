@@ -6,6 +6,10 @@ Tools to manage gittuf policies
 
 The 'policy' command provides a suite of tools for managing gittuf policy configurations. This command serves as a parent for several subcommands that allow users to initialize policy, add or remove principals, view or reorder existing rules and principals, or apply, stage, or discard trust policy changes. To manage policies through a terminal UI, use 'gittuf tui' instead.
 
+```
+gittuf policy [flags]
+```
+
 ### Options
 
 ```

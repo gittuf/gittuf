@@ -6,6 +6,10 @@ Tools for attesting to code contributions
 
 The 'attest' command provides tools for attesting to code contributions. It includes subcommands to apply attestations, authorize contributors, and integrate GitHub-based attestations.
 
+```
+gittuf attest [flags]
+```
+
 ### Options
 
 ```

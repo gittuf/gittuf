@@ -6,6 +6,10 @@ Tools for managing remote RSLs
 
 The 'remote' command provides tools for managing RSL interactions with remote repositories. It is used to organize and execute operations such as pulling, pushing, and the RSL between local and remote sources.
 
+```
+gittuf rsl remote [flags]
+```
+
 ### Options
 
 ```
