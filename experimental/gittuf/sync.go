@@ -8,6 +8,7 @@ import (
 	"errors"
 	"log/slog"
 	"os"
+	"path"
 	"reflect"
 	"sort"
 	"strings"
@@ -15,11 +16,13 @@ import (
 	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
 	"github.com/gittuf/gittuf/pkg/gitinterface"
+	"github.com/go-git/go-git/v6/plumbing/transport"
 )
 
 var (
 	ErrCloningRepository          = errors.New("unable to clone repository")
 	ErrDirExists                  = errors.New("directory exists")
+	ErrCannotDetermineCloneDir    = errors.New("unable to guess a directory name from the remote URL, please specify one")
 	ErrExpectedRootKeysDoNotMatch = errors.Join(ErrCloningRepository, errors.New("cloned root keys do not match the expected keys"))
 )
 
@@ -33,12 +36,11 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	slog.Debug("Cloning remote repository", "remoteURL", remoteURL)
 
 	if dir == "" {
-		// FIXME: my understanding is backslashes are not used in URLs but I haven't dived into the RFCs to check yet
-		modifiedURL := strings.ReplaceAll(remoteURL, "\\", "/")
-		modifiedURL = strings.TrimRight(strings.TrimSpace(modifiedURL), "/") // Trim spaces and trailing slashes if any
-
-		split := strings.Split(modifiedURL, "/")
-		dir = strings.TrimSuffix(split[len(split)-1], ".git")
+		cloneDir, err := determineCloneDir(remoteURL)
+		if err != nil {
+			return nil, errors.Join(ErrCloningRepository, err)
+		}
+		dir = cloneDir
 	}
 
 	slog.Debug("Checking if local directory exists for repository...")
@@ -112,4 +114,35 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	}
 	slog.Debug("Verifying HEAD...")
 	return repository, repository.VerifyRef(ctx, head)
+}
+
+// determineCloneDir returns the directory name to clone remoteURL into when
+// none is specified. Like Git, it uses the last path component without ".git"
+// (so "/path/to/repo/.git" and "host:repo.git" are both cloned into "repo"),
+// and falls back to the hostname when the URL has no path. If neither gives a
+// usable name, it returns ErrCannotDetermineCloneDir.
+//
+// See the <directory> option in https://git-scm.com/docs/git-clone and
+// git_url_basename() in Git's dir.c:
+// https://github.com/git/git/blob/77904e546de3bd940621092ecec47a88d0cede5d/dir.c#L3290
+func determineCloneDir(remoteURL string) (string, error) {
+	endpoint, err := transport.ParseURL(strings.TrimSpace(remoteURL))
+	if err != nil {
+		return "", err
+	}
+
+	// Local Windows paths keep their backslashes, so normalize them first
+	urlPath := strings.ReplaceAll(endpoint.Path, "\\", "/")
+	urlPath = strings.TrimSuffix(strings.TrimRight(urlPath, "/"), "/.git")
+
+	dir := strings.TrimSuffix(path.Base(urlPath), ".git")
+	if dir == "." || dir == "/" {
+		dir = endpoint.Hostname()
+	}
+
+	if dir == "" || dir == ".." {
+		return "", ErrCannotDetermineCloneDir
+	}
+
+	return dir, nil
 }
