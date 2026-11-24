@@ -32,8 +32,12 @@ func main() {
 
 	rootCmd := root.New()
 	if err := rootCmd.Execute(); err != nil {
-		// Deferred functions do not run under os.Exit, so report here too. It
-		// emits at most once.
+		// Deferred functions do not run under os.Exit, so stop profiling and
+		// report here too. Both run at most once.
+		if err := profile.StopProfiling(); err != nil {
+			fmt.Fprintf(os.Stderr, "unexpected profiling error: %s\n", err.Error())
+		}
+
 		root.ReportStorerTrace(os.Stderr)
 
 		if root.IsUpgradeRequiredError(err) {
