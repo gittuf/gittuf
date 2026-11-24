@@ -35,6 +35,9 @@ func (s *trustPropagationScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 
 	switch m.screen {
 	case screenTrustPropagation:
+		if s.showDirectives {
+			return *m, nil
+		}
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 			if sel, ok := s.operationList.SelectedItem().(item); ok {
 				s.selectAction(sel.title, m)
