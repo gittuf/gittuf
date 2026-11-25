@@ -955,6 +955,83 @@ func TestReconcileLocalRSLWithRemote(t *testing.T) {
 		assert.Equal(t, originalLocalRSLTip, currentLocalRSLTip)
 	})
 
+	t.Run("remote and local have diverged, local only propagation entry is preserved", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		remoteR := gitinterface.CreateTestGitRepository(t, tmpDir, false)
+		remoteRepo := &Repository{r: newStorer(remoteR)}
+
+		treeBuilder := gitinterface.NewTreeBuilder(remoteR)
+		emptyTreeHash, err := treeBuilder.WriteTreeFromEntries(nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		// Simulate remote actions
+		if _, err := remoteR.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Clone remote repository
+		localTmpDir := filepath.Join(os.TempDir(), fmt.Sprintf("local-%s", t.Name()))
+		defer os.RemoveAll(localTmpDir) //nolint:errcheck
+		localR, err := gitinterface.CloneAndFetchRepository(tmpDir, localTmpDir, refName, []string{rsl.Ref}, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		require.NoError(t, localR.SetGitConfig("user.name", "Jane Doe"))
+		require.NoError(t, localR.SetGitConfig("user.email", "jane.doe@example.com"))
+		localRepo := &Repository{r: newStorer(localR)}
+
+		// Simulate remote actions on refName, so local and remote diverge
+		// without touching the same ref
+		if _, err := remoteRepo.r.Commit(emptyTreeHash, refName, "Test commit", false); err != nil {
+			t.Fatal(err)
+		}
+		if err := remoteRepo.RecordRSLEntryForReference(testCtx, refName, false, rslopts.WithRecordLocalOnly()); err != nil {
+			t.Fatal(err)
+		}
+
+		// Record a local-only propagation entry on anotherRefName. Reconciliation
+		// reapplies local-only entries over the remote tip, and this checks it
+		// handles propagation entries, not only reference and annotation entries.
+		propagationCommitID, err := localRepo.r.Commit(emptyTreeHash, anotherRefName, "Propagated commit", false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		upstreamEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := rsl.NewPropagationEntry(anotherRefName, propagationCommitID, "https://example.com/upstream", upstreamEntryID).Commit(localRepo.r, false); err != nil {
+			t.Fatal(err)
+		}
+
+		originalPropagationEntryID, err := localRepo.r.GetReference(rsl.Ref)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		err = localRepo.ReconcileLocalRSLWithRemote(testCtx, remoteName, false)
+		assert.NoError(t, err)
+
+		// The propagation entry is reapplied over the new remote tip: it is the
+		// RSL tip, with a new ID and unchanged fields.
+		latestEntry, err := rsl.GetLatestEntry(localRepo.r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		propagationEntry, ok := latestEntry.(*rsl.PropagationEntry)
+		require.True(t, ok, "latest entry after reconciliation must be the reapplied propagation entry")
+		assert.NotEqual(t, originalPropagationEntryID, propagationEntry.GetID(), "test is invalid if entry's ID didn't change on reapply")
+		assert.Equal(t, anotherRefName, propagationEntry.RefName)
+		assert.Equal(t, propagationCommitID, propagationEntry.TargetID)
+		assert.Equal(t, "https://example.com/upstream", propagationEntry.UpstreamRepository)
+		assert.Equal(t, upstreamEntryID, propagationEntry.UpstreamEntryID)
+	})
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
