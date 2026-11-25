@@ -5,10 +5,12 @@ package tui
 
 import (
 	"context"
+	"log/slog"
 	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	verifyopts "github.com/gittuf/gittuf/experimental/gittuf/options/verify"
 )
 
 func TestVerifyRefScreenValidation(t *testing.T) {
@@ -167,4 +169,78 @@ func TestFormComponentCycleFocus(t *testing.T) {
 	if formView == "" {
 		t.Error("expected non-empty form View()")
 	}
+}
+
+func TestBuildVerifyRefOptions(t *testing.T) {
+	apply := func(remoteRefName string, latestOnly bool) verifyopts.Options {
+		var o verifyopts.Options
+		for _, opt := range buildVerifyRefOptions(remoteRefName, latestOnly) {
+			opt(&o)
+		}
+		return o
+	}
+
+	set := apply("refs/heads/upstream-main", true)
+	if set.RefNameOverride != "refs/heads/upstream-main" {
+		t.Errorf("expected ref name override %q, got %q", "refs/heads/upstream-main", set.RefNameOverride)
+	}
+	if !set.LatestOnly {
+		t.Errorf("expected LatestOnly to be true")
+	}
+
+	empty := apply("", false)
+	if empty.RefNameOverride != "" {
+		t.Errorf("expected no ref name override for empty input, got %q", empty.RefNameOverride)
+	}
+	if empty.LatestOnly {
+		t.Errorf("expected LatestOnly to be false")
+	}
+}
+
+func TestVerifyFormsValidSubmission(t *testing.T) {
+	defaultLogger := slog.Default()
+	t.Cleanup(func() { slog.SetDefault(defaultLogger) })
+
+	o := &options{
+		readOnly:  true,
+		targetRef: "policy",
+	}
+
+	t.Run("Verify Ref", func(t *testing.T) {
+		m := initialModel(context.Background(), o)
+		m.screen = screenVerifyRefForm
+		m.verifyRefScreen.reset()
+		m.verifyRefScreen.form.inputs[0].SetValue("refs/heads/main")
+		m.verifyRefScreen.form.inputs[1].SetValue("refs/heads/upstream-main")
+		m.verifyRefScreen.form.inputs[2].SetValue("y")
+
+		updatedModel, _ := m.verifyRefScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		if !resModel.verifying {
+			t.Errorf("expected verifying to be true")
+		}
+		if resModel.errorMsg != "" {
+			t.Errorf("expected empty errorMsg, got %q", resModel.errorMsg)
+		}
+	})
+
+	t.Run("Verify Mergeable", func(t *testing.T) {
+		m := initialModel(context.Background(), o)
+		m.screen = screenVerifyMergeableForm
+		m.verifyMergeableScreen.reset()
+		m.verifyMergeableScreen.form.inputs[0].SetValue("refs/heads/feature")
+		m.verifyMergeableScreen.form.inputs[1].SetValue("refs/heads/main")
+		m.verifyMergeableScreen.form.inputs[2].SetValue("y")
+
+		updatedModel, _ := m.verifyMergeableScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		resModel := updatedModel.(model)
+
+		if !resModel.verifying {
+			t.Errorf("expected verifying to be true")
+		}
+		if resModel.errorMsg != "" {
+			t.Errorf("expected empty errorMsg, got %q", resModel.errorMsg)
+		}
+	})
 }
