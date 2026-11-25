@@ -95,9 +95,9 @@ func (f *FileStatus) Untracked() bool {
 }
 
 func (r *Repository) Status() (map[string]FileStatus, error) {
-	worktree := r.gitDirPath
-	if !r.IsBare() {
-		worktree = strings.TrimSuffix(worktree, ".git") // TODO: this doesn't support detached git dir
+	worktree, err := r.GetWorktree()
+	if err != nil {
+		return nil, fmt.Errorf("unable to check status of repository: %w", err)
 	}
 
 	output, err := r.executor("status", "--porcelain=1", "-z", "--untracked-files=all", "--ignored").withDir(worktree).executeString()
