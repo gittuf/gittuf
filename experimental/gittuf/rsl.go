@@ -422,6 +422,10 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
 				return fmt.Errorf("unable to reapply reference entry '%s': %w", originalEntryID.String(), err)
 			}
+		case *rsl.PropagationEntry:
+			if err := rsl.NewPropagationEntry(entry.RefName, entry.TargetID, entry.UpstreamRepository, entry.UpstreamEntryID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
+				return fmt.Errorf("unable to reapply propagation entry '%s': %w", originalEntryID.String(), err)
+			}
 		case *rsl.AnnotationEntry:
 			rslEntryIDs := make([]githash.Hash, 0, len(entry.RSLEntryIDs))
 			for _, id := range entry.RSLEntryIDs {
