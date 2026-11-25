@@ -370,16 +370,16 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 	localUpdatedRefs := set.NewSet[string]()
 	for _, entry := range localOnlyEntries {
 		slog.Debug("Identified local only RSL entry that must be reapplied", "entryID", entry.GetID().String())
-		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
-			localUpdatedRefs.Add(entry.RefName)
+		if entry, isRefEntry := entry.(rsl.ReferenceUpdaterEntry); isRefEntry {
+			localUpdatedRefs.Add(entry.GetRefName())
 		}
 	}
 
 	remoteUpdatedRefs := set.NewSet[string]()
 	for _, entry := range remoteOnlyEntries {
 		slog.Debug("Identified remote only RSL entry", "entryID", entry.GetID().String())
-		if entry, isRefEntry := entry.(*rsl.ReferenceEntry); isRefEntry {
-			remoteUpdatedRefs.Add(entry.RefName)
+		if entry, isRefEntry := entry.(rsl.ReferenceUpdaterEntry); isRefEntry {
+			remoteUpdatedRefs.Add(entry.GetRefName())
 		}
 	}
 
@@ -421,6 +421,10 @@ func (r *Repository) ReconcileLocalRSLWithRemote(ctx context.Context, remoteName
 		case *rsl.ReferenceEntry:
 			if err := rsl.NewReferenceEntry(entry.RefName, entry.TargetID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
 				return fmt.Errorf("unable to reapply reference entry '%s': %w", originalEntryID.String(), err)
+			}
+		case *rsl.PropagationEntry:
+			if err := rsl.NewPropagationEntry(entry.RefName, entry.TargetID, entry.UpstreamRepository, entry.UpstreamEntryID, rsl.WithCustomFields(entry.CustomFields)).Commit(r.r, sign); err != nil {
+				return fmt.Errorf("unable to reapply propagation entry '%s': %w", originalEntryID.String(), err)
 			}
 		case *rsl.AnnotationEntry:
 			rslEntryIDs := make([]githash.Hash, 0, len(entry.RSLEntryIDs))
