@@ -8,6 +8,7 @@ import (
 	"github.com/gittuf/gittuf/internal/cmd/attest/authorize"
 	"github.com/gittuf/gittuf/internal/cmd/attest/github"
 	"github.com/gittuf/gittuf/internal/cmd/attest/persistent"
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/spf13/cobra"
 )
 
@@ -17,6 +18,8 @@ func New() *cobra.Command {
 		Use:               "attest",
 		Short:             "Tools for attesting to code contributions",
 		Long:              `The 'attest' command provides tools for attesting to code contributions. It includes subcommands to apply attestations, authorize contributors, and integrate GitHub-based attestations.`,
+		Args:              common.SubcommandRequired,
+		RunE:              common.ShowHelp,
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)

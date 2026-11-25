@@ -4,6 +4,7 @@
 package trust
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addcontrollerrepository"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addgithubapp"
 	"github.com/gittuf/gittuf/internal/cmd/trust/addglobalrule"
@@ -43,6 +44,8 @@ func New() *cobra.Command {
 		Use:               "trust",
 		Short:             "Tools for gittuf's root of trust",
 		Long:              `The 'trust' command provides tools to manage gittuf's root of trust, including subcommands to initialize trust, add/remove keys and rules, configure GitHub App approvals, sign commits, and manage policy settings enforced through gittuf's RSL framework.`,
+		Args:              common.SubcommandRequired,
+		RunE:              common.ShowHelp,
 		DisableAutoGenTag: true,
 	}
 	o.AddPersistentFlags(cmd)

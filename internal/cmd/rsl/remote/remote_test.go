@@ -96,3 +96,16 @@ func TestRemoteCommands(t *testing.T) {
 		assert.ErrorContains(t, err, "No such remote")
 	})
 }
+
+func TestSubcommandRequired(t *testing.T) {
+	t.Run("unknown subcommand", func(t *testing.T) {
+		_, _, _, err := cmd.ExecuteCommandC(New(), "nosuch")
+		assert.ErrorContains(t, err, `unknown command "nosuch" for "remote"`)
+	})
+
+	t.Run("no subcommand prints help", func(t *testing.T) {
+		_, stdOut, _, err := cmd.ExecuteCommandC(New(), []string{}...)
+		assert.NoError(t, err)
+		assert.Contains(t, stdOut.String(), "remote [command]")
+	})
+}

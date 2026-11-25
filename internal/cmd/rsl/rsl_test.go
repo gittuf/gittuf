@@ -6,6 +6,7 @@ package rsl
 import (
 	"testing"
 
+	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -14,4 +15,17 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "rsl", cmd.Use)
 	assert.True(t, cmd.HasSubCommands())
+}
+
+func TestSubcommandRequired(t *testing.T) {
+	t.Run("unknown subcommand", func(t *testing.T) {
+		_, _, _, err := cmd.ExecuteCommandC(New(), "nosuch")
+		assert.ErrorContains(t, err, `unknown command "nosuch" for "rsl"`)
+	})
+
+	t.Run("no subcommand prints help", func(t *testing.T) {
+		_, stdOut, _, err := cmd.ExecuteCommandC(New(), []string{}...)
+		assert.NoError(t, err)
+		assert.Contains(t, stdOut.String(), "rsl [command]")
+	})
 }

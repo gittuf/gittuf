@@ -4,6 +4,7 @@
 package rsl
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/annotate"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/log"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/propagate"
@@ -18,6 +19,8 @@ func New() *cobra.Command {
 		Use:               "rsl",
 		Short:             "Tools to manage the repository's reference state log",
 		Long:              "The 'rsl' subcommand provides tools for managing the repository's Reference State Log (RSL). It is used to view, record, annotate, and synchronize RSL entries to track and audit reference state changes.",
+		Args:              common.SubcommandRequired,
+		RunE:              common.ShowHelp,
 		DisableAutoGenTag: true,
 	}
 
