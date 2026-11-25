@@ -4,6 +4,7 @@
 package gittuf
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -193,6 +194,12 @@ func TestClone(t *testing.T) {
 		}
 		_, err = Clone(testCtx, remoteTmpDir, dirName, "", nil, true)
 		assert.ErrorIs(t, err, ErrDirExists)
+	})
+
+	t.Run("unsuccessful clone when dir cannot be guessed from the url, bare", func(t *testing.T) {
+		_, err := Clone(testCtx, "/", "", "", nil, true)
+		assert.ErrorIs(t, err, ErrCloningRepository)
+		assert.ErrorIs(t, err, ErrCannotDetermineCloneDir)
 	})
 
 	t.Run("successful clone without specifying dir, with trailing slashes in repository path, bare", func(t *testing.T) {
@@ -445,5 +452,109 @@ func TestClone(t *testing.T) {
 
 		_, err := Clone(testCtx, remoteTmpDir, "", "", []string{rootPubKeyPath, gpgKeyRef}, false)
 		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+	})
+}
+
+func TestDetermineCloneDir(t *testing.T) {
+	tests := map[string]struct {
+		remoteURL   string
+		expectedDir string
+		expectedErr error
+	}{
+		"https url": {
+			remoteURL:   "https://github.com/gittuf/gittuf",
+			expectedDir: "gittuf",
+		},
+		"https url with .git suffix": {
+			remoteURL:   "https://github.com/gittuf/gittuf.git",
+			expectedDir: "gittuf",
+		},
+		"ssh url with port": {
+			remoteURL:   "ssh://git@example.com:2222/gittuf/gittuf.git",
+			expectedDir: "gittuf",
+		},
+		"scp-like url": {
+			remoteURL:   "git@github.com:gittuf/gittuf.git",
+			expectedDir: "gittuf",
+		},
+		"scp-like url without slash": {
+			remoteURL:   "example.com:gittuf.git",
+			expectedDir: "gittuf",
+		},
+		"local path": {
+			remoteURL:   "/tmp/gittuf",
+			expectedDir: "gittuf",
+		},
+		"local path with trailing slashes": {
+			remoteURL:   "/tmp/gittuf//",
+			expectedDir: "gittuf",
+		},
+		"local path to .git directory": {
+			remoteURL:   "/tmp/gittuf/.git",
+			expectedDir: "gittuf",
+		},
+		"local path to .git directory with trailing slash": {
+			remoteURL:   "/tmp/gittuf/.git/",
+			expectedDir: "gittuf",
+		},
+		"file url to .git directory": {
+			remoteURL:   "file:///tmp/gittuf/.git",
+			expectedDir: "gittuf",
+		},
+		"windows path": {
+			remoteURL:   `C:\Users\jane\gittuf`,
+			expectedDir: "gittuf",
+		},
+		"windows path with forward slashes": {
+			remoteURL:   "C:/Users/jane/gittuf",
+			expectedDir: "gittuf",
+		},
+		"url without path": {
+			remoteURL:   "https://example.com",
+			expectedDir: "example.com",
+		},
+		"url without path with port": {
+			remoteURL:   "https://example.com:8080/",
+			expectedDir: "example.com",
+		},
+		"root path": {
+			remoteURL:   "/",
+			expectedErr: ErrCannotDetermineCloneDir,
+		},
+		"current directory": {
+			remoteURL:   ".",
+			expectedErr: ErrCannotDetermineCloneDir,
+		},
+		"root .git directory": {
+			remoteURL:   "/.git",
+			expectedErr: ErrCannotDetermineCloneDir,
+		},
+		"file url without path": {
+			remoteURL:   "file:///",
+			expectedErr: ErrCannotDetermineCloneDir,
+		},
+		"path ending in parent directory": {
+			remoteURL:   "/tmp/..",
+			expectedErr: ErrCannotDetermineCloneDir,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			dir, err := determineCloneDir(test.remoteURL)
+			if test.expectedErr != nil {
+				assert.ErrorIs(t, err, test.expectedErr)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, test.expectedDir, dir)
+		})
+	}
+
+	t.Run("invalid url", func(t *testing.T) {
+		_, err := determineCloneDir("https://example.com/%zz")
+		var urlErr *url.Error
+		assert.ErrorAs(t, err, &urlErr)
 	})
 }
