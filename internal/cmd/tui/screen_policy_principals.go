@@ -468,7 +468,7 @@ func getCurrPrincipals(ctx context.Context, o *options) []tuf.Principal {
 	if err != nil {
 		return nil
 	}
-	return getPrincipalsForRef(ctx, repo, "policy", o.policyName)
+	return getPrincipalsForRef(ctx, repo, o.targetRef, o.policyName)
 }
 
 func getPrincipalsForRef(ctx context.Context, repo *gittuf.Repository, targetRef, policyName string) []tuf.Principal {
