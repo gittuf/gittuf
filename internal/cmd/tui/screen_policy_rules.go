@@ -250,7 +250,7 @@ func (s *policyRulesScreen) View(m *model) string {
 			)
 		}
 
-		listView := m.renderListOrEmpty(s.ruleList, len(s.rules), "No rules configured")
+		listView := m.renderListOrEmpty(s.ruleList, len(s.rules), "No rules configured", "rule")
 		overlays := overlay + renderActionHints(m.readOnly) + hint
 
 		return m.renderScreen("Home › Policy › Rules", listView, overlays)
