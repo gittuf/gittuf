@@ -6,6 +6,7 @@ package tui
 import (
 	"context"
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -304,10 +305,12 @@ func getRulesForRef(ctx context.Context, repo *gittuf.Repository, targetRef stri
 
 	var currRules = make([]rule, len(rules))
 	for i, r := range rules {
+		keys := r.Delegation.GetPrincipalIDs().Contents()
+		slices.Sort(keys)
 		currRules[i] = rule{
 			name:      r.Delegation.ID(),
 			pattern:   strings.Join(r.Delegation.GetProtectedNamespaces(), ", "),
-			key:       strings.Join(r.Delegation.GetPrincipalIDs().Contents(), ", "),
+			key:       strings.Join(keys, ", "),
 			threshold: r.Delegation.GetThreshold(),
 		}
 	}
