@@ -31,8 +31,9 @@ func NewReferenceAuthorizationForCommit(targetRef, fromID, toID string) (*ita.St
 // provided information. The authorization is embedded in an in-toto "statement"
 // and returned with the appropriate "predicate type" set. The `fromID` and
 // `toID` specify the change to `targetRef` that is to be authorized by invoking
-// this function. Since this is for a tag, the `toID` is expected to be a Git
-// commit ID.
+// this function. Since this is for a tag, the `toID` is expected to be the ID
+// of the object the tag points to once chained tags are peeled. That object may
+// be a commit, a tree, or a blob.
 func NewReferenceAuthorizationForTag(targetRef, fromID, toID string) (*ita.Statement, error) {
 	return authorizationsv02.NewReferenceAuthorizationForTag(targetRef, fromID, toID)
 }
