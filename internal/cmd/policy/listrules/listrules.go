@@ -5,6 +5,7 @@ package listrules
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
@@ -83,7 +84,9 @@ func (o *options) Run(cmd *cobra.Command, _ []string) error {
 		if _, err := fmt.Fprintln(stdOut, strings.Repeat("    ", curRule.Depth+1)+"Authorized keys:"); err != nil {
 			return err
 		}
-		for _, key := range curRule.Delegation.GetPrincipalIDs().Contents() {
+		keys := curRule.Delegation.GetPrincipalIDs().Contents()
+		slices.Sort(keys)
+		for _, key := range keys {
 			if _, err := fmt.Fprintf(stdOut, strings.Repeat("    ", curRule.Depth+2)+"%s\n", key); err != nil {
 				return err
 			}
