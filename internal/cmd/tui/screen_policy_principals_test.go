@@ -222,21 +222,9 @@ func TestGetCurrPrincipalsHonorsTargetRef(t *testing.T) {
 	require.NoError(t, repoAddPrincipal(t.Context(), stagingOpts, person))
 
 	stagedPrincipals := getCurrPrincipals(t.Context(), stagingOpts)
-	stagedIDs := make([]string, 0, len(stagedPrincipals))
-	for _, p := range stagedPrincipals {
-		stagedIDs = append(stagedIDs, p.ID())
-	}
-	assert.Contains(t, stagedIDs, person.PersonID)
+	require.Len(t, stagedPrincipals, 1)
+	assert.Equal(t, person.PersonID, stagedPrincipals[0].ID())
 
-	policyOpts := &options{
-		p:          &persistent.Options{SigningKey: keyPath},
-		policyName: policy.TargetsRoleName,
-		targetRef:  "policy",
-	}
-	policyPrincipals := getCurrPrincipals(t.Context(), policyOpts)
-	policyIDs := make([]string, 0, len(policyPrincipals))
-	for _, p := range policyPrincipals {
-		policyIDs = append(policyIDs, p.ID())
-	}
-	assert.NotContains(t, policyIDs, person.PersonID)
+	stagingOpts.targetRef = policy.PolicyRef
+	assert.Empty(t, getCurrPrincipals(t.Context(), stagingOpts))
 }
