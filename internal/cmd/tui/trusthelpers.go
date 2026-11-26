@@ -5,12 +5,16 @@ package tui
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"slices"
 	"strings"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
 	trustpolicyopts "github.com/gittuf/gittuf/experimental/gittuf/options/trustpolicy"
+	"github.com/gittuf/gittuf/internal/policy"
 	"github.com/gittuf/gittuf/internal/tuf"
+	"github.com/secure-systems-lab/go-securesystemslib/signerverifier"
 )
 
 type globalRule struct {
@@ -27,6 +31,16 @@ type trustPropagationDirective struct {
 	upstreamPath        string
 	downstreamReference string
 	downstreamPath      string
+}
+
+// trustKeys holds the root and top-level policy keys shown in the TUI, along
+// with the principals (and their keys) declared in the top-level policy.
+type trustKeys struct {
+	rootKeys         []tuf.Principal
+	rootThreshold    int
+	policyKeys       []tuf.Principal
+	policyThreshold  int
+	policyPrincipals []tuf.Principal
 }
 
 // getGlobalRules returns a slice of globalRule for the TUI
@@ -159,6 +173,63 @@ func repoUpdateGlobalRule(ctx context.Context, o *options, gr globalRule) error 
 	default:
 		return tuf.ErrUnknownGlobalRuleType
 	}
+}
+
+// repoListTrustKeys returns the root and top-level policy keys for the TUI
+func repoListTrustKeys(ctx context.Context, o *options) (*trustKeys, error) {
+	repo, err := gittuf.LoadRepository(".")
+	if err != nil {
+		return nil, err
+	}
+
+	rootKeys, rootThreshold, err := repo.ListRootThresholdAndKeys(ctx, o.targetRef)
+	if err != nil {
+		return nil, err
+	}
+
+	sortPrincipalsByID(rootKeys)
+	keys := &trustKeys{
+		rootKeys:      rootKeys,
+		rootThreshold: rootThreshold,
+	}
+
+	// Top-level policy keys are not set until a policy key is added, which
+	// is not an error for listing purposes
+	policyKeys, policyThreshold, err := repo.ListTopLevelTargetsThresholdAndKeys(ctx, o.targetRef)
+	switch {
+	case err == nil:
+		sortPrincipalsByID(policyKeys)
+		keys.policyKeys = policyKeys
+		keys.policyThreshold = policyThreshold
+	case !errors.Is(err, tuf.ErrPrimaryRuleFileInformationNotFoundInRoot):
+		return nil, err
+	}
+
+	// The top-level policy file does not exist until it is initialized, which
+	// is also not an error for listing purposes
+	principals, err := repo.ListPrincipals(ctx, o.targetRef, policy.TargetsRoleName)
+	if err != nil {
+		if !errors.Is(err, policy.ErrPolicyNotFound) {
+			return nil, err
+		}
+		return keys, nil
+	}
+
+	keys.policyPrincipals = make([]tuf.Principal, 0, len(principals))
+	for _, principal := range principals {
+		keys.policyPrincipals = append(keys.policyPrincipals, principal)
+	}
+	sortPrincipalsByID(keys.policyPrincipals)
+
+	return keys, nil
+}
+
+// sortPrincipalsByID sorts principals by ID so that the TUI lists them in a
+// stable order, as metadata stores them in unordered sets and maps.
+func sortPrincipalsByID(principals []tuf.Principal) {
+	slices.SortFunc(principals, func(a, b tuf.Principal) int {
+		return strings.Compare(a.ID(), b.ID())
+	})
 }
 
 // repoAddRootKey take the TUI input and adds a root key to the repository
@@ -609,4 +680,45 @@ func (s *trustPropagationScreen) renderDirectives() string {
 	}
 
 	return strings.TrimSpace(b.String())
+}
+
+// writeTrustKeyPrincipals writes each principal as a line in a list.
+func writeTrustKeyPrincipals(b *strings.Builder, principals []tuf.Principal) {
+	if len(principals) == 0 {
+		b.WriteString("  None configured.\n")
+		return
+	}
+
+	for _, principal := range principals {
+		fmt.Fprintf(b, "  • %s", principal.ID())
+		if keys := principal.Keys(); len(keys) > 0 {
+			fmt.Fprintf(b, " (%s)", keys[0].KeyType)
+		}
+		b.WriteString("\n")
+	}
+}
+
+// writePolicyFilePrincipals writes each principal declared in the policy file
+// along with all of its keys.
+func writePolicyFilePrincipals(b *strings.Builder, principals []tuf.Principal) {
+	if len(principals) == 0 {
+		b.WriteString("  None configured.\n")
+		return
+	}
+
+	for _, principal := range principals {
+		fmt.Fprintf(b, "  • %s\n", principal.ID())
+		// Copy before sorting so the principal's own key slice is not modified
+		keys := slices.Clone(principal.Keys())
+		if len(keys) == 0 {
+			b.WriteString("      (no keys)\n")
+			continue
+		}
+		slices.SortFunc(keys, func(a, b *signerverifier.SSLibKey) int {
+			return strings.Compare(a.KeyID, b.KeyID)
+		})
+		for _, key := range keys {
+			fmt.Fprintf(b, "      - %s (%s)\n", key.KeyID, key.KeyType)
+		}
+	}
 }
