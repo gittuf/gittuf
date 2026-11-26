@@ -21,16 +21,19 @@ func (s *trustScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 				case "View Global Rules":
 					m.screen = screenTrustGlobalRules
 					m.trustGlobalRulesScreen.refreshGlobalRules(m.ctx, m.options)
-				case "Keys & Thresholds":
-					m.screen = screenTrustKeysThresholds
 				case "Propagation":
 					m.screen = screenTrustPropagation
+				case "Keys & Thresholds":
+					m.screen = screenTrustKeysThresholds
 				case "GitHub App":
 					m.screen = screenTrustGitHubApp
 				case "Lifecycle":
 					m.screen = screenTrustLifecycle
 				case "Repo/Network":
 					m.screen = screenTrustRepoNetwork
+				case "Additional Information":
+					m.screen = screenTrustAdditionalInformation
+					m.trustAdditionalInformationScreen.refreshRootMetadata(m)
 				}
 			}
 			return *m, nil
