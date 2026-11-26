@@ -305,7 +305,13 @@ func TestRecordRSLAnnotation(t *testing.T) {
 
 	repo := &Repository{r: newStorer(r)}
 
-	err := repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
+	err := repo.RecordRSLAnnotation(testCtx, []string{}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
+	assert.ErrorIs(t, err, rsl.ErrInvalidRSLEntry)
+
+	err = repo.RecordRSLAnnotation(testCtx, nil, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
+	assert.ErrorIs(t, err, rsl.ErrInvalidRSLEntry)
+
+	err = repo.RecordRSLAnnotation(testCtx, []string{gitinterface.ZeroHash.String()}, false, "test annotation", false, rslopts.WithAnnotateLocalOnly())
 	assert.ErrorIs(t, err, rsl.ErrRSLEntryNotFound)
 
 	treeBuilder := gitinterface.NewTreeBuilder(repo.r.Repository)
