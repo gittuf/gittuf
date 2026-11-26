@@ -6,6 +6,8 @@ package gittuf
 import (
 	"errors"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gittuf/gittuf/internal/signerverifier/gpg"
@@ -127,7 +129,11 @@ func LoadPublicKeyFromGitConfig(repo *Repository) (tuf.Principal, error) {
 	case signingMethodSSH:
 		// SSH
 		// Load an SSH signer from the specified key
-		return LoadPublicKey(repo, signingKey)
+		keyPath, err := expandUserPath(signingKey)
+		if err != nil {
+			return nil, err
+		}
+		return LoadPublicKey(repo, keyPath)
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
@@ -224,7 +230,11 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	case signingMethodSSH:
 		// SSH
 		// Load an SSH signer from the specified key
-		return ssh.NewSignerFromFile(signingKey)
+		keyPath, err := expandUserPath(signingKey)
+		if err != nil {
+			return nil, err
+		}
+		return ssh.NewSignerFromFile(keyPath)
 	case signingMethodX509:
 		// X.509
 		// We only support sigstore X.509, so check that gitsign is specified
@@ -244,6 +254,22 @@ func LoadSignerFromGitConfig(repo *Repository) (sslibdsse.SignerVerifier, error)
 	default:
 		return nil, ErrSigningKeyNotSpecified
 	}
+}
+
+// expandUserPath replaces a leading "~" in the path with the current user's
+// home directory. Git does this for the SSH key path in user.signingKey, so a
+// value like "~/.ssh/id_ed25519.pub" must work here too.
+func expandUserPath(path string) (string, error) {
+	if path != "~" && !strings.HasPrefix(path, "~/") && !strings.HasPrefix(path, "~"+string(filepath.Separator)) {
+		return path, nil
+	}
+
+	homeDir, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("unable to expand '~' in signing key path: %w", err)
+	}
+
+	return filepath.Join(homeDir, path[1:]), nil
 }
 
 func getGPGOptions(storer gitstore.Storer) ([]gpg.SignerOption, error) {

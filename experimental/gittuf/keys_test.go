@@ -285,6 +285,22 @@ func TestLoadSignerFromGitConfig(t *testing.T) {
 			require.NoError(t, err)
 			assert.Equal(t, compareSigner.KeyID, signerKeyID)
 		})
+
+		t.Run("ssh key path starts with ~", func(t *testing.T) {
+			tmpDir := t.TempDir()
+			repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
+
+			setTestHomeDir(t)
+			require.NoError(t, repo.r.SetGitConfig("user.signingkey", "~/.ssh/key.pub"))
+
+			signer, err := LoadSignerFromGitConfig(repo)
+			require.NoError(t, err)
+
+			compareSigner := ssh.NewKeyFromBytes(t, artifacts.SSHRSAPrivate)
+			signerKeyID, err := signer.KeyID()
+			require.NoError(t, err)
+			assert.Equal(t, compareSigner.KeyID, signerKeyID)
+		})
 	})
 
 	t.Run("X.509", func(t *testing.T) {
@@ -357,6 +373,95 @@ func TestLoadPublicKey(t *testing.T) {
 			assert.Error(t, err)
 		})
 	})
+}
+
+func TestLoadPublicKeyFromGitConfig(t *testing.T) {
+	// Ensure tests aren't affected by local config
+	t.Setenv("GIT_CONFIG_GLOBAL", os.DevNull)
+	t.Setenv("GIT_CONFIG_SYSTEM", os.DevNull)
+
+	t.Run("ssh key specified", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
+
+		key, err := LoadPublicKeyFromGitConfig(repo)
+		require.NoError(t, err)
+
+		compareKey := ssh.NewKeyFromBytes(t, artifacts.SSHRSAPrivate)
+		assert.Equal(t, compareKey.KeyID, key.ID())
+	})
+
+	t.Run("ssh key path starts with ~", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		repo := &Repository{r: newStorer(gitinterface.CreateTestGitRepository(t, tmpDir, false))}
+
+		setTestHomeDir(t)
+		require.NoError(t, repo.r.SetGitConfig("user.signingkey", "~/.ssh/key.pub"))
+
+		key, err := LoadPublicKeyFromGitConfig(repo)
+		require.NoError(t, err)
+
+		compareKey := ssh.NewKeyFromBytes(t, artifacts.SSHRSAPrivate)
+		assert.Equal(t, compareKey.KeyID, key.ID())
+	})
+}
+
+func TestExpandUserPath(t *testing.T) {
+	homeDir := setTestHomeDir(t)
+
+	tests := map[string]struct {
+		path     string
+		expected string
+	}{
+		"only ~": {
+			path:     "~",
+			expected: homeDir,
+		},
+		"path under ~": {
+			path:     "~/.ssh/key.pub",
+			expected: filepath.Join(homeDir, ".ssh", "key.pub"),
+		},
+		"absolute path": {
+			path:     filepath.Join(homeDir, "key.pub"),
+			expected: filepath.Join(homeDir, "key.pub"),
+		},
+		"relative path": {
+			path:     "key.pub",
+			expected: "key.pub",
+		},
+		"~ not followed by a separator": {
+			path:     "~key.pub",
+			expected: "~key.pub",
+		},
+		"~ in the middle": {
+			path:     "keys/~/key.pub",
+			expected: "keys/~/key.pub",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			path, err := expandUserPath(test.path)
+			require.NoError(t, err)
+			assert.Equal(t, test.expected, path)
+		})
+	}
+}
+
+// setTestHomeDir points the home directory at a new temporary directory that
+// holds the test SSH public key at .ssh/key.pub, and returns its path.
+func setTestHomeDir(t *testing.T) string {
+	t.Helper()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+	t.Setenv("USERPROFILE", homeDir) // used by os.UserHomeDir on Windows
+
+	sshDir := filepath.Join(homeDir, ".ssh")
+	require.NoError(t, os.Mkdir(sshDir, 0o700))
+	require.NoError(t, os.WriteFile(filepath.Join(sshDir, "key.pub"), artifacts.SSHRSAPublicSSH, 0o600))
+
+	return homeDir
 }
 
 func TestGetSigstoreOptions(t *testing.T) {
