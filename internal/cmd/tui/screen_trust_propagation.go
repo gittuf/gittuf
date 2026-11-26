@@ -35,6 +35,9 @@ func (s *trustPropagationScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.C
 
 	switch m.screen {
 	case screenTrustPropagation:
+		if s.showDirectives {
+			return *m, nil
+		}
 		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "enter" {
 			if sel, ok := s.operationList.SelectedItem().(item); ok {
 				s.selectAction(sel.title, m)
@@ -73,7 +76,12 @@ func (s *trustPropagationScreen) View(m *model) string {
 	switch m.screen {
 	case screenTrustPropagation:
 		if s.showDirectives {
-			return m.renderScreen("Home › Trust › Propagation", s.renderDirectives(), renderActionHints(m.readOnly))
+			hints := "\n" + renderStyledHelp([][2]string{
+				{"esc", "back to menu"},
+				{"h", "help"},
+				{"q", "quit"},
+			})
+			return m.renderScreen("Home › Trust › Propagation › Directives", s.renderDirectives(), hints)
 		}
 		return m.renderScreen("Home › Trust › Propagation", s.operationList.View(), renderActionHints(m.readOnly))
 	case screenTrustAddPropagationForm:
