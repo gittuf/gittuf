@@ -177,7 +177,7 @@ func writeRSLReferenceEntry(writer io.WriteCloser, entry *rsl.ReferenceEntry, an
 		}
 		text = appendCustomFields(text, annotation.CustomFields, "    ")
 		text += "\n    Message:"
-		for _, line := range strings.Split(strings.TrimSpace(annotation.Message), "\n") {
+		for line := range strings.SplitSeq(strings.TrimSpace(annotation.Message), "\n") {
 			text += "\n"
 			// Indent each line of the message so that multi-line messages stay
 			// within the annotation's block, but don't add trailing whitespace

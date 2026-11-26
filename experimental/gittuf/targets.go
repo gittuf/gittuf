@@ -305,9 +305,9 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 	// assume which role is the delegating role (diamond delegations are legal).
 	// See: https://github.com/gittuf/gittuf/issues/246.
 
-	principalIDs := ""
+	var principalIDs strings.Builder
 	for _, principal := range authorizedPrincipals {
-		principalIDs += fmt.Sprintf("\n%s", principal.ID())
+		principalIDs.WriteString(fmt.Sprintf("\n%s", principal.ID()))
 	}
 
 	slog.Debug("Loading current rule file...")
@@ -327,7 +327,7 @@ func (r *Repository) AddPrincipalToTargets(ctx context.Context, signer sslibdsse
 		}
 	}
 
-	commitMessage := fmt.Sprintf("Add principals to policy '%s'\n%s", targetsRoleName, principalIDs)
+	commitMessage := fmt.Sprintf("Add principals to policy '%s'\n%s", targetsRoleName, principalIDs.String())
 	return r.updateTargetsMetadata(ctx, state, signer, targetsRoleName, targetsMetadata, commitMessage, options.CreateRSLEntry, signCommit)
 }
 

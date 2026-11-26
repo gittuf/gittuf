@@ -514,7 +514,6 @@ func (r *Repository) DismissGitHubPullRequestApprover(ctx context.Context, signe
 
 	approvers := make([]string, 0, len(predicate.GetApprovers()))
 	for _, approver := range predicate.GetApprovers() {
-		approver := approver
 		if approver == dismissedApprover {
 			continue
 		}
