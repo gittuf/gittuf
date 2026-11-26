@@ -6,6 +6,10 @@ Tools to manage the repository's reference state log
 
 The 'rsl' subcommand provides tools for managing the repository's Reference State Log (RSL). It is used to view, record, annotate, and synchronize RSL entries to track and audit reference state changes.
 
+```
+gittuf rsl [flags]
+```
+
 ### Options
 
 ```

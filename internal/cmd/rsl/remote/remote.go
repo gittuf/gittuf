@@ -4,6 +4,7 @@
 package remote
 
 import (
+	"github.com/gittuf/gittuf/internal/cmd/common"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/pull"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/push"
 	"github.com/gittuf/gittuf/internal/cmd/rsl/remote/reconcile"
@@ -15,6 +16,8 @@ func New() *cobra.Command {
 		Use:               "remote",
 		Short:             "Tools for managing remote RSLs",
 		Long:              "The 'remote' command provides tools for managing RSL interactions with remote repositories. It is used to organize and execute operations such as pulling, pushing, and the RSL between local and remote sources.",
+		Args:              common.SubcommandRequired,
+		RunE:              common.ShowHelp,
 		DisableAutoGenTag: true,
 	}
 

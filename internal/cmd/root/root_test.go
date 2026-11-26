@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/gittuf/gittuf/experimental/gittuf"
+	"github.com/gittuf/gittuf/internal/cmd"
 	"github.com/gittuf/gittuf/internal/dev"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -82,4 +83,21 @@ func TestNew(t *testing.T) {
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("no-color"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("verbose"))
 	assert.NotNil(t, cmd.PersistentFlags().Lookup("profile"))
+}
+
+func TestGroupCommandSkipsStartup(t *testing.T) {
+	// Both the go-git backend check and --profile live in PersistentPreRunE,
+	// which a command that only groups others should not get to.
+	t.Setenv(gittuf.StorerBackendEnvKey, string(gittuf.StorerBackendGoGit))
+	t.Setenv(dev.DevModeKey, "")
+	t.Chdir(t.TempDir())
+
+	_, _, _, err := cmd.ExecuteCommandC(New(), "policy", "--profile")
+	assert.NoError(t, err)
+
+	_, _, _, err = cmd.ExecuteCommandC(New(), "policy", "nosuch", "--profile")
+	assert.ErrorContains(t, err, `unknown command "nosuch" for "gittuf policy"`)
+
+	assert.NoFileExists(t, "cpu.prof")
+	assert.NoFileExists(t, "memory.prof")
 }
