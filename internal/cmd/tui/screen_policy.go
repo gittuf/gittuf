@@ -22,7 +22,7 @@ func (s *policyScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 				case "View Rules":
 					m.screen = screenPolicyRules
 					m.policyRulesScreen.refreshRules(m.ctx, m.options)
-				case "Manage Principals":
+				case "Manage Principals", "View Principals":
 					m.screen = screenPolicyPrincipals
 					m.policyPrincipalsScreen.refreshPrincipals(m.ctx, m.options)
 				case "Manage Lifecycle":

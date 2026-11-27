@@ -119,6 +119,29 @@ func TestTUI(t *testing.T) {
 		tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second*15))
 	})
+	t.Run("Policy Menu Hides Write-Only Sections In Read-Only Mode", func(t *testing.T) {
+		o := &options{readOnly: true, targetRef: "policy"}
+		m := initialModel(context.Background(), o)
+		tm := teatest.NewTestModel(t, m, teatest.WithInitialTermSize(80, 24))
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			return strings.Contains(string(out), "Policy")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		tm.Send(tea.KeyMsg{Type: tea.KeyEnter})
+
+		teatest.WaitFor(t, tm.Output(), func(out []byte) bool {
+			content := string(out)
+			return strings.Contains(content, "Home › Policy") &&
+				strings.Contains(content, "View Rules") &&
+				strings.Contains(content, "View Principals") &&
+				!strings.Contains(content, "Manage Principals") &&
+				!strings.Contains(content, "Manage Lifecycle")
+		}, teatest.WithCheckInterval(time.Millisecond*100), teatest.WithDuration(time.Second*15))
+
+		tm.Send(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+		tm.WaitFinished(t, teatest.WithFinalTimeout(time.Second*15))
+	})
 	t.Run("Trust Menu Hides Write-Only Sections In Read-Only Mode", func(t *testing.T) {
 		o := &options{readOnly: true, targetRef: "policy"}
 		m := initialModel(context.Background(), o)
@@ -370,6 +393,64 @@ func TestViewRendersErrorDialog(t *testing.T) {
 	assert.Contains(t, view, "Apply Changes Failed")
 	assert.Contains(t, view, "remote rejected update")
 	assert.Contains(t, view, "Press Enter or Esc to close.")
+}
+
+func TestPolicyMenuItemsAndRouting(t *testing.T) {
+	t.Run("read-only items and routing", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		// Start with readOnly=false, then flip to readOnly=true via initDoneMsg
+		// to verify applyReadOnlyMenus updates the Policy menu dynamically.
+		m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+		require.Len(t, m.policyScreen.policyScreenList.Items(), 3)
+
+		updatedInit, _ := m.Update(initDoneMsg{readOnly: true})
+		m = updatedInit.(model)
+
+		roItems := m.policyScreen.policyScreenList.Items()
+		require.Len(t, roItems, 2)
+		assert.Equal(t, "View Rules", roItems[0].(item).title)
+		assert.Equal(t, "View Principals", roItems[1].(item).title)
+
+		m.screen = screenPolicy
+		m.policyScreen.policyScreenList.Select(1)
+		updated, _ := m.policyScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &m)
+		typed := updated.(model)
+		assert.Equal(t, screenPolicyPrincipals, typed.screen)
+	})
+
+	t.Run("edit mode routes all three items", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Chdir(tmpDir)
+		gitinterface.CreateTestGitRepository(t, tmpDir, false)
+
+		m := initialModel(context.Background(), &options{readOnly: false, targetRef: "policy"})
+		require.Len(t, m.policyScreen.policyScreenList.Items(), 3)
+
+		tests := []struct {
+			name   string
+			index  int
+			screen screen
+		}{
+			{name: "view rules", index: 0, screen: screenPolicyRules},
+			{name: "manage principals", index: 1, screen: screenPolicyPrincipals},
+			{name: "manage lifecycle", index: 2, screen: screenPolicyLifecycle},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				local := m
+				local.screen = screenPolicy
+				local.policyScreen.policyScreenList.Select(tt.index)
+
+				updated, _ := local.policyScreen.Update(tea.KeyMsg{Type: tea.KeyEnter}, &local)
+				typed := updated.(model)
+				assert.Equal(t, tt.screen, typed.screen)
+			})
+		}
+	})
 }
 
 func TestTrustMenuRoutesToWriteScreens(t *testing.T) {
