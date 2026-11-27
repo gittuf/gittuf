@@ -172,6 +172,20 @@ func newMenuList(title string, items []list.Item, delegate list.DefaultDelegate)
 	return l
 }
 
+func policyMenuItems(readOnly bool) []list.Item {
+	if readOnly {
+		return []list.Item{
+			item{title: "View Rules", desc: "View policy rules"},
+			item{title: "View Principals", desc: "View policy principals and keys"},
+		}
+	}
+	return []list.Item{
+		item{title: "View Rules", desc: "View and manage policy rules"},
+		item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
+		item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply, discard, pull or push policy changes"},
+	}
+}
+
 func trustMenuItems(readOnly bool) []list.Item {
 	items := []list.Item{
 		item{title: "View Global Rules", desc: "View and manage global rules"},
@@ -315,11 +329,7 @@ func initialModel(ctx context.Context, o *options) model {
 			}, delegate),
 		},
 		policyScreen: policyScreen{
-			policyScreenList: newMenuList("gittuf Policy Operations", []list.Item{
-				item{title: "View Rules", desc: "View and manage policy rules"},
-				item{title: "Manage Principals", desc: "View and manage policy principals and keys"},
-				item{title: "Manage Lifecycle", desc: "Initialize, sign, stage, apply, discard, pull or push policy changes"},
-			}, delegate),
+			policyScreenList: newMenuList("gittuf Policy Operations", policyMenuItems(o.readOnly), delegate),
 		},
 		policyLifecycleScreen: policyLifecycleScreen{
 			list: newMenuList("Policy Lifecycle", []list.Item{
@@ -373,6 +383,7 @@ func initialModel(ctx context.Context, o *options) model {
 }
 
 func (m *model) applyReadOnlyMenus() {
+	m.policyScreen.policyScreenList.SetItems(policyMenuItems(m.readOnly))
 	m.trustScreen.trustScreenList.SetItems(trustMenuItems(m.readOnly))
 	m.trustKeysScreen.operationList.SetItems(trustKeysMenuItems(m.readOnly))
 	m.trustLifecycleScreen.operationList.SetItems(trustLifecycleMenuItems(m.readOnly))
