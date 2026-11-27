@@ -258,7 +258,15 @@ func TestClone(t *testing.T) {
 		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
 
 		_, err := Clone(testCtx, remoteTmpDir, "", "", []string{rootPubKeyPath, gpgKeyRef}, true)
-		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+		assert.ErrorIs(t, err, ErrExpectedRootKeysDoNotMatch)
+
+		// The clone is removed because the root keys are not the expected ones
+		cloneDir, dirErr := determineCloneDir(remoteTmpDir)
+		if dirErr != nil {
+			t.Fatal(dirErr)
+		}
+		_, statErr := os.Stat(cloneDir)
+		assert.True(t, os.IsNotExist(statErr))
 	})
 
 	t.Run("unsuccessful clone with error loading expected root keys, bare", func(t *testing.T) {
@@ -451,7 +459,15 @@ func TestClone(t *testing.T) {
 		gpg.SetupTestGPGHomeDir(t, gpgKeyBytes)
 
 		_, err := Clone(testCtx, remoteTmpDir, "", "", []string{rootPubKeyPath, gpgKeyRef}, false)
-		assert.ErrorIs(t, ErrExpectedRootKeysDoNotMatch, err)
+		assert.ErrorIs(t, err, ErrExpectedRootKeysDoNotMatch)
+
+		// The clone is removed because the root keys are not the expected ones
+		cloneDir, dirErr := determineCloneDir(remoteTmpDir)
+		if dirErr != nil {
+			t.Fatal(dirErr)
+		}
+		_, statErr := os.Stat(cloneDir)
+		assert.True(t, os.IsNotExist(statErr))
 	})
 }
 

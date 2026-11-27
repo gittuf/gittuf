@@ -60,10 +60,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 	slog.Debug("Cloning repository...")
 	r, err := gitinterface.CloneAndFetchRepository(remoteURL, dir, initialBranch, refs, bare)
 	if err != nil {
-		if e := os.RemoveAll(dir); e != nil {
-			return nil, errors.Join(ErrCloningRepository, err, e)
-		}
-		return nil, errors.Join(ErrCloningRepository, err)
+		return nil, removeCloneDir(dir, errors.Join(ErrCloningRepository, err))
 	}
 	head, err := r.GetSymbolicReferenceTarget("HEAD")
 	if err != nil {
@@ -77,10 +74,7 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		for _, keyRef := range expectedRootKeyRefs {
 			key, err := LoadPublicKey(repository, keyRef)
 			if err != nil {
-				if e := os.RemoveAll(dir); e != nil {
-					return nil, errors.Join(ErrCloningRepository, err, e)
-				}
-				return nil, errors.Join(ErrCloningRepository, err)
+				return nil, removeCloneDir(dir, errors.Join(ErrCloningRepository, err))
 			}
 			expectedRootKeys = append(expectedRootKeys, key)
 		}
@@ -93,11 +87,11 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 
 		state, err := policy.LoadFirstState(ctx, repository.GetStorer())
 		if err != nil {
-			return repository, errors.Join(ErrCloningRepository, err)
+			return nil, removeCloneDir(dir, errors.Join(ErrCloningRepository, err))
 		}
 		rootKeys, err := state.GetRootKeys()
 		if err != nil {
-			return repository, errors.Join(ErrCloningRepository, err)
+			return nil, removeCloneDir(dir, errors.Join(ErrCloningRepository, err))
 		}
 
 		// We sort the root keys so that we can check if the root keys array match's the expected root key array
@@ -106,14 +100,26 @@ func Clone(ctx context.Context, remoteURL, dir, initialBranch string, expectedRo
 		})
 
 		if len(rootKeys) != len(expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
+			return nil, removeCloneDir(dir, ErrExpectedRootKeysDoNotMatch)
 		}
 		if !reflect.DeepEqual(rootKeys, expectedRootKeys) {
-			return repository, ErrExpectedRootKeysDoNotMatch
+			return nil, removeCloneDir(dir, ErrExpectedRootKeysDoNotMatch)
 		}
 	}
 	slog.Debug("Verifying HEAD...")
 	return repository, repository.VerifyRef(ctx, head)
+}
+
+// removeCloneDir removes the directory Clone created once the clone has failed,
+// so that a failed clone leaves nothing behind and a retry is not refused with
+// ErrDirExists. A removal error is joined onto err rather than replacing it,
+// since the original failure is the one the user needs to see.
+func removeCloneDir(dir string, err error) error {
+	if e := os.RemoveAll(dir); e != nil {
+		return errors.Join(err, e)
+	}
+
+	return err
 }
 
 // determineCloneDir returns the directory name to clone remoteURL into when
