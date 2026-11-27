@@ -9,8 +9,20 @@ on:
 permissions: read-all
 jobs:
   demo:
-    name: Run demo
+    name: Run ${{ matrix.demo.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        demo:
+          - name: demo
+            script: run-demo.py
+          - name: multi-repo demo
+            script: run-multi-repo-demo.py
+          - name: recovery demo
+            script: run-recovery-demo.py
+          - name: signatures demo
+            script: run-signatures-demo.py
     steps:
       - name: Checkout code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -32,4 +44,8 @@ jobs:
         with:
           python-version: '3.14'
       - name: Run demo script
-        run: python run-demo.py --no-prompt
+        env:
+          DEMO_SCRIPT: ${{ matrix.demo.script }}
+          # run-multi-repo-demo.py reads NO_PROMPT instead of --no-prompt
+          NO_PROMPT: "1"
+        run: python "$DEMO_SCRIPT" --no-prompt
