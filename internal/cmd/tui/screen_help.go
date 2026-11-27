@@ -4,6 +4,9 @@
 package tui
 
 import (
+	"fmt"
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -23,6 +26,59 @@ func (s *helpScreen) Update(msg tea.Msg, m *model) (tea.Model, tea.Cmd) {
 	return *m, nil
 }
 
+func (s *helpScreen) helpEntries(readOnly bool) [][2]string {
+	entries := [][2]string{
+		{"↑ ↓", "Navigate"},
+	}
+
+	switch s.previousScreen {
+	case screenPolicyRules:
+		if !readOnly {
+			entries = append(entries,
+				[2]string{"a", "Add rule"},
+				[2]string{"e", "Edit rule"},
+				[2]string{"d", "Delete rule"},
+				[2]string{"j / k", "Reorder rules"},
+			)
+		}
+	case screenPolicyPrincipals:
+		if !readOnly {
+			entries = append(entries,
+				[2]string{"a", "Add principal"},
+				[2]string{"e", "Edit principal"},
+				[2]string{"d", "Delete principal"},
+			)
+		}
+	case screenTrustGlobalRules:
+		if !readOnly {
+			entries = append(entries,
+				[2]string{"a", "Add global rule"},
+				[2]string{"e", "Edit global rule"},
+				[2]string{"d", "Delete global rule"},
+			)
+		}
+	case screenLoading:
+		entries = append(entries, [2]string{"Enter", "Select"})
+		if !readOnly {
+			entries = append(entries,
+				[2]string{"a", "Add"},
+				[2]string{"e", "Edit"},
+				[2]string{"d", "Delete"},
+			)
+		}
+	default:
+		entries = append(entries, [2]string{"Enter", "Select"})
+	}
+
+	entries = append(entries,
+		[2]string{"v", "Review staged diff"},
+		[2]string{"h", "Toggle help"},
+		[2]string{"esc", "Back"},
+		[2]string{"q", "Quit"},
+	)
+	return entries
+}
+
 func (s *helpScreen) View(m *model) string {
 	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 	boxWidth := m.width - h - 2
@@ -35,15 +91,12 @@ func (s *helpScreen) View(m *model) string {
 	}
 
 	title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(colorFocus)).Render("Help")
-	helpContent := title + "\n\n" +
-		"- ↑ ↓ : Navigate\n" +
-		"- Enter : Select\n" +
-		"- a : Add rule\n" +
-		"- e : Edit\n" +
-		"- d : Delete\n" +
-		"- esc : Back\n" +
-		"- q : Quit\n"
+	var b strings.Builder
+	b.WriteString(title + "\n\n")
+	for _, entry := range s.helpEntries(m.readOnly) {
+		fmt.Fprintf(&b, "- %s : %s\n", entry[0], entry[1])
+	}
 
-	centeredContent := lipgloss.Place(boxWidth, boxHeight, lipgloss.Center, lipgloss.Center, helpContent)
+	centeredContent := lipgloss.Place(boxWidth, boxHeight, lipgloss.Center, lipgloss.Center, b.String())
 	return m.renderScreen("Help", centeredContent, "")
 }
