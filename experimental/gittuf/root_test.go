@@ -2447,6 +2447,17 @@ func TestEnableController(t *testing.T) {
 	require.Nil(t, err)
 	assert.True(t, rootMetadata.IsController())
 
+	// If repository is already a controller, EnableController should be a no-op
+	policyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+	require.NoError(t, err)
+
+	err = r.EnableController(testCtx, rootSigner, false)
+	require.NoError(t, err)
+
+	currentPolicyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+	require.NoError(t, err)
+	assert.Equal(t, policyTip, currentPolicyTip)
+
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()
 		repo := gitinterface.CreateTestGitRepository(t, tempDir, false)
@@ -2499,6 +2510,17 @@ func TestDisableController(t *testing.T) {
 	rootMetadata, err := state.GetRootMetadata(false)
 	require.Nil(t, err)
 	assert.False(t, rootMetadata.IsController())
+
+	// If repository is already not a controller, DisableController should be a no-op
+	policyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+	require.NoError(t, err)
+
+	err = r.DisableController(testCtx, rootSigner, false)
+	require.NoError(t, err)
+
+	currentPolicyTip, err := r.r.GetReference(policy.PolicyStagingRef)
+	require.NoError(t, err)
+	assert.Equal(t, policyTip, currentPolicyTip)
 
 	t.Run("miscellaneous error checking", func(t *testing.T) {
 		tempDir := t.TempDir()

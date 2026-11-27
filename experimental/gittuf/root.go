@@ -1045,6 +1045,11 @@ func (r *Repository) EnableController(ctx context.Context, signer sslibdsse.Sign
 		return err
 	}
 
+	if rootMetadata.IsController() {
+		slog.Debug("Repository is already marked as a controller, exiting...")
+		return nil
+	}
+
 	slog.Debug("Making repository controller...")
 	if err := rootMetadata.EnableController(); err != nil {
 		return err
@@ -1089,6 +1094,11 @@ func (r *Repository) DisableController(ctx context.Context, signer sslibdsse.Sig
 	rootMetadata, err := r.loadRootMetadata(state, rootKeyID)
 	if err != nil {
 		return err
+	}
+
+	if !rootMetadata.IsController() {
+		slog.Debug("Repository is already not marked as a controller, exiting...")
+		return nil
 	}
 
 	slog.Debug("Disabling repository as controller...")
