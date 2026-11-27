@@ -240,7 +240,7 @@ func (s *trustGlobalRulesScreen) View(m *model) string {
 			)
 		}
 
-		listView := m.renderListOrEmpty(s.globalRuleList, len(s.globalRules), "No global rules configured")
+		listView := m.renderListOrEmpty(s.globalRuleList, len(s.globalRules), "No global rules configured", "global rule")
 		overlays := overlay + renderActionHints(m.readOnly) + hint
 		return m.renderScreen("Home › Trust › Global Rules", listView, overlays)
 

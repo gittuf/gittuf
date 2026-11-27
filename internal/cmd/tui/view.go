@@ -417,16 +417,25 @@ func (m model) renderScreen(title string, listContent string, overlays string) s
 }
 
 // renderListOrEmpty generates dynamic content evaluating array length against fallback empty states.
-func (m model) renderListOrEmpty(l list.Model, length int, emptyTitleText string) string {
+func (m model) renderListOrEmpty(l list.Model, length int, emptyTitleText, itemNoun string) string {
 	if length > 0 {
 		return l.View()
+	}
+
+	if itemNoun == "" {
+		itemNoun = "item"
 	}
 
 	h, v := lipgloss.NewStyle().Margin(1, 2).GetFrameSize()
 
 	emptyTitle := lipgloss.NewStyle().Foreground(lipgloss.Color(colorRegularText)).Bold(true).Render(emptyTitleText)
-	emptyDesc := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render("Get started by adding your first rule.\n\nPress 'a' to add rule")
-	emptyState := lipgloss.JoinVertical(lipgloss.Center, emptyTitle, "\n", emptyDesc)
+	emptyState := emptyTitle
+	if !m.readOnly {
+		emptyDesc := lipgloss.NewStyle().Foreground(lipgloss.Color(colorSubtext)).Render(
+			fmt.Sprintf("Get started by adding your first %s.\n\nPress 'a' to add %s", itemNoun, itemNoun),
+		)
+		emptyState = lipgloss.JoinVertical(lipgloss.Center, emptyTitle, "\n", emptyDesc)
+	}
 
 	boxWidth := m.width - h - 2
 	heightOffset := 8

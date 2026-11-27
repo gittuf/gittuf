@@ -298,7 +298,7 @@ func (s *policyPrincipalsScreen) View(m *model) string {
 	if s.addChoice {
 		listView = s.renderChoiceMenu(m)
 	} else {
-		listView = m.renderListOrEmpty(s.list, len(s.principals), "No principals configured")
+		listView = m.renderListOrEmpty(s.list, len(s.principals), "No principals configured", "principal")
 	}
 
 	overlays := overlay

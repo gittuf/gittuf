@@ -192,15 +192,73 @@ func TestRenderListOrEmpty(t *testing.T) {
 	l := list.New([]list.Item{item{title: "item-1"}}, list.NewDefaultDelegate(), 80, 20)
 
 	// Non-empty list returns l.View()
-	viewStr := m.renderListOrEmpty(l, 1, "No items")
+	viewStr := m.renderListOrEmpty(l, 1, "No items", "rule")
 	if !strings.Contains(viewStr, "item-1") {
 		t.Errorf("expected item-1 in list view, got %q", viewStr)
 	}
 
-	// Empty list returns placeholder
-	emptyView := m.renderListOrEmpty(l, 0, "No items found")
-	if !strings.Contains(emptyView, "No items found") {
-		t.Errorf("expected empty state text, got %q", emptyView)
+	// Read-only empty list returns title without write call-to-action
+	emptyReadOnly := m.renderListOrEmpty(l, 0, "No rules configured", "rule")
+	if !strings.Contains(emptyReadOnly, "No rules configured") {
+		t.Errorf("expected empty state title, got %q", emptyReadOnly)
+	}
+	if strings.Contains(emptyReadOnly, "Press 'a'") || strings.Contains(emptyReadOnly, "Get started by adding") {
+		t.Errorf("expected read-only empty state to omit add prompt, got %q", emptyReadOnly)
+	}
+
+	// Edit mode empty list includes entity-specific call-to-action
+	m.readOnly = false
+	for _, tc := range []struct {
+		title string
+		noun  string
+		want  string
+	}{
+		{"No rules configured", "rule", "Press 'a' to add rule"},
+		{"No principals configured", "principal", "Press 'a' to add principal"},
+		{"No global rules configured", "global rule", "Press 'a' to add global rule"},
+		{"No items configured", "", "Press 'a' to add item"},
+	} {
+		got := m.renderListOrEmpty(l, 0, tc.title, tc.noun)
+		if !strings.Contains(got, tc.title) {
+			t.Errorf("expected title %q in %q", tc.title, got)
+		}
+		if !strings.Contains(got, tc.want) {
+			t.Errorf("expected prompt %q in %q", tc.want, got)
+		}
+	}
+}
+
+func TestEmptyScreensRespectReadOnlyAndEntityNoun(t *testing.T) {
+	m := initialModel(context.Background(), &options{
+		readOnly:  true,
+		targetRef: "policy",
+		p:         &persistent.Options{SigningKey: "dummy-key"},
+	})
+	m.width = 100
+	m.height = 30
+
+	screens := []struct {
+		scr      screen
+		wantEdit string
+	}{
+		{screenPolicyRules, "Press 'a' to add rule"},
+		{screenPolicyPrincipals, "Press 'a' to add principal"},
+		{screenTrustGlobalRules, "Press 'a' to add global rule"},
+	}
+
+	for _, tc := range screens {
+		m.screen = tc.scr
+		m.readOnly = true
+		roView := m.View()
+		if strings.Contains(roView, "Press 'a'") {
+			t.Errorf("screen %v in read-only mode should not advertise 'Press a', got %q", tc.scr, roView)
+		}
+
+		m.readOnly = false
+		editView := m.View()
+		if !strings.Contains(editView, tc.wantEdit) {
+			t.Errorf("screen %v in edit mode should contain %q, got %q", tc.scr, tc.wantEdit, editView)
+		}
 	}
 }
 
