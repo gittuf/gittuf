@@ -816,6 +816,18 @@ func TestGetRootPrincipals(t *testing.T) {
 		assert.Nil(t, rootPrincipals)
 	})
 
+	t.Run("root role names a principal that is not declared", func(t *testing.T) {
+		rootMetadata := initialTestRootMetadata(t)
+		rootMetadata.addRole(tuf.RootRoleName, Role{
+			PrincipalIDs: set.NewSetFromItems("undeclared-principal"),
+			Threshold:    1,
+		})
+
+		rootPrincipals, err := rootMetadata.GetRootPrincipals()
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+		assert.Nil(t, rootPrincipals)
+	})
+
 	t.Run("with person", func(t *testing.T) {
 		rootMetadata := initialTestRootMetadata(t)
 
@@ -862,6 +874,18 @@ func TestGetPrimaryRuleFilePrincipals(t *testing.T) {
 		assert.Nil(t, rootPrincipals)
 	})
 
+	t.Run("targets role names a principal that is not declared", func(t *testing.T) {
+		rootMetadata := initialTestRootMetadata(t)
+		rootMetadata.addRole(tuf.TargetsRoleName, Role{
+			PrincipalIDs: set.NewSetFromItems("undeclared-principal"),
+			Threshold:    1,
+		})
+
+		principals, err := rootMetadata.GetPrimaryRuleFilePrincipals()
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+		assert.Nil(t, principals)
+	})
+
 	t.Run("with person", func(t *testing.T) {
 		rootMetadata := initialTestRootMetadata(t)
 
@@ -895,6 +919,17 @@ func TestGetGitHubAppPrincipals(t *testing.T) {
 		rootPrincipals, err := rootMetadata.GetGitHubAppPrincipals(tuf.GitHubAppRoleName)
 		assert.ErrorIs(t, err, tuf.ErrGitHubAppInformationNotFoundInRoot)
 		assert.Nil(t, rootPrincipals)
+	})
+
+	t.Run("app entry names a principal that is not declared", func(t *testing.T) {
+		rootMetadata := initialTestRootMetadata(t)
+		err := rootMetadata.AddGitHubAppPrincipal(tuf.GitHubAppRoleName, key)
+		assert.Nil(t, err)
+		rootMetadata.GitHubApps[tuf.GitHubAppRoleName].PrincipalIDs = set.NewSetFromItems("undeclared-principal")
+
+		principals, err := rootMetadata.GetGitHubAppPrincipals(tuf.GitHubAppRoleName)
+		assert.ErrorIs(t, err, tuf.ErrPrincipalNotFound)
+		assert.Nil(t, principals)
 	})
 }
 
